@@ -167,5 +167,11 @@ set -a && source .env && set +a
 mvn compile exec:java
 ```
 
-Run the PostgreSQL integration check with `mvn -Ddb.integration=true verify` while the database is running.
+Run the PostgreSQL integration check from WSL with the `.env` credentials loaded into Maven's environment:
+
+```bash
+set -a && source .env && set +a
+mvn -Ddb.integration=true verify
+```
+
 That verification also enforces at least 90% line coverage and writes the report to `target/site/jacoco/index.html`.
