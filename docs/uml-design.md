@@ -217,7 +217,7 @@ sequenceDiagram
     Search->>Bookings: findOverlapping(room, interval)
     Bookings-->>Search: Existing bookings
     Search-->>Menu: Matching available rooms
-    Operator->>Menu: Select room and customer; enter comments
+    Operator->>Menu: Select room and customer, then enter optional comments
     Menu->>Service: createBooking(booking request)
     Service->>Customers: find customer
     Service->>Rooms: find selected room
