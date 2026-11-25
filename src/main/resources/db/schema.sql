@@ -4,17 +4,39 @@ CREATE TABLE IF NOT EXISTS customers (
     customer_id UUID PRIMARY KEY,
     customer_type VARCHAR(20) NOT NULL CHECK (customer_type IN ('COMPANY', 'INDIVIDUAL')),
     display_name VARCHAR(200) NOT NULL,
-    email VARCHAR(320) NOT NULL,
+    email VARCHAR(320) NOT NULL UNIQUE,
     phone VARCHAR(50),
     CHECK (length(trim(display_name)) > 0),
     CHECK (length(trim(email)) > 0)
 );
 
+DO $constraints$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'customers'::regclass AND conname = 'customers_email_key'
+    ) THEN
+        ALTER TABLE customers ADD CONSTRAINT customers_email_key UNIQUE (email);
+    END IF;
+END;
+$constraints$;
+
 CREATE TABLE IF NOT EXISTS booking_users (
     booking_user_id UUID PRIMARY KEY,
     name VARCHAR(200) NOT NULL CHECK (length(trim(name)) > 0),
-    email VARCHAR(320) NOT NULL CHECK (length(trim(email)) > 0)
+    email VARCHAR(320) NOT NULL UNIQUE CHECK (length(trim(email)) > 0)
 );
+
+DO $constraints$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'booking_users'::regclass AND conname = 'booking_users_email_key'
+    ) THEN
+        ALTER TABLE booking_users ADD CONSTRAINT booking_users_email_key UNIQUE (email);
+    END IF;
+END;
+$constraints$;
 
 CREATE TABLE IF NOT EXISTS classrooms (
     classroom_id UUID PRIMARY KEY,

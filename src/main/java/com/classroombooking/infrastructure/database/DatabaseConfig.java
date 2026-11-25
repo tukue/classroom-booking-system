@@ -6,9 +6,8 @@ import java.util.Map;
 public record DatabaseConfig(String jdbcUrl, String username, String password) {
     private static final String DEFAULT_DATABASE = "classroom_booking";
     private static final String DEFAULT_USERNAME = "classroom_app";
-    private static final String DEFAULT_PASSWORD = "classroom_dev";
 
-    /** Builds connection settings from environment variables, using local Compose defaults. */
+    /** Builds connection settings from environment variables and requires an explicit password. */
     public static DatabaseConfig fromEnvironment() {
         return fromEnvironment(System.getenv());
     }
@@ -18,7 +17,15 @@ public record DatabaseConfig(String jdbcUrl, String username, String password) {
         return new DatabaseConfig(
                 jdbcUrl,
                 environment.getOrDefault("POSTGRES_USER", DEFAULT_USERNAME),
-                environment.getOrDefault("POSTGRES_PASSWORD", DEFAULT_PASSWORD));
+                requiredPassword(environment));
+    }
+
+    private static String requiredPassword(Map<String, String> environment) {
+        String password = environment.get("POSTGRES_PASSWORD");
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException("POSTGRES_PASSWORD must be set in the environment or .env file.");
+        }
+        return password;
     }
 
     private static String defaultJdbcUrl(Map<String, String> environment) {

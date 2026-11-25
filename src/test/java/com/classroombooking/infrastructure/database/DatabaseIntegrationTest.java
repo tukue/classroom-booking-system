@@ -80,22 +80,70 @@ class DatabaseIntegrationTest {
         }
     }
 
+    @Test
+    void rejectsDuplicateCustomerEmails() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+
+        try (Connection connection = databaseManager.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                String email = "duplicate-" + UUID.randomUUID() + "@example.test";
+                insertCustomer(connection, UUID.randomUUID(), email);
+                SQLException duplicate = assertThrows(SQLException.class,
+                        () -> insertCustomer(connection, UUID.randomUUID(), email));
+                assertEquals("23505", duplicate.getSQLState());
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    @Test
+    void rejectsDuplicateBookingUserEmails() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+
+        try (Connection connection = databaseManager.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                String email = "duplicate-" + UUID.randomUUID() + "@example.test";
+                insertBookingUser(connection, UUID.randomUUID(), email);
+                SQLException duplicate = assertThrows(SQLException.class,
+                        () -> insertBookingUser(connection, UUID.randomUUID(), email));
+                assertEquals("23505", duplicate.getSQLState());
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
     private void insertCustomer(Connection connection, UUID customerId) throws SQLException {
+        insertCustomer(connection, customerId, customerId + "@example.test");
+    }
+
+    private void insertCustomer(Connection connection, UUID customerId, String email)
+            throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO customers (customer_id, customer_type, display_name, email) "
                         + "VALUES (?, 'COMPANY', 'Integration Test Customer', ?)")) {
             statement.setObject(1, customerId);
-            statement.setString(2, customerId + "@example.test");
+            statement.setString(2, email);
             statement.executeUpdate();
         }
     }
 
     private void insertBookingUser(Connection connection, UUID bookingUserId) throws SQLException {
+        insertBookingUser(connection, bookingUserId, bookingUserId + "@example.test");
+    }
+
+    private void insertBookingUser(Connection connection, UUID bookingUserId, String email)
+            throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO booking_users (booking_user_id, name, email) VALUES (?, ?, ?)")) {
             statement.setObject(1, bookingUserId);
             statement.setString(2, "Integration Test User");
-            statement.setString(3, bookingUserId + "@example.test");
+            statement.setString(3, email);
             statement.executeUpdate();
         }
     }

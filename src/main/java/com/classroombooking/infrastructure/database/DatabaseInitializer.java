@@ -38,11 +38,8 @@ public final class DatabaseInitializer {
             throws IOException, SQLException {
         String script = readResource(resourcePath);
         try (Statement statement = connection.createStatement()) {
-            for (String command : script.split(";")) {
-                String sql = command.strip();
-                if (!sql.isEmpty()) {
-                    statement.execute(sql);
-                }
+            for (String sql : SqlScriptParser.splitStatements(script)) {
+                statement.execute(sql);
             }
         }
     }
@@ -55,7 +52,6 @@ public final class DatabaseInitializer {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             return reader.lines()
-                    .filter(line -> !line.stripLeading().startsWith("--"))
                     .collect(Collectors.joining("\n"));
         }
     }
