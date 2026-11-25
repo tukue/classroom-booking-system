@@ -1,206 +1,267 @@
-# Classroom Booking System — Initial UML Design
+# Classroom Booking System — Requirements and UML Design
 
-This is a first-pass domain and component model to guide implementation. Users book a classroom for a date and time; a booking is confirmed immediately if it does not overlap another active booking for the same room. There is no approval workflow.
+This design reflects only the supplied facility-management requirements: manage 20 training classrooms, register company and individual customers, search and book rooms through a console, and persist data in a SQL database using JDBC.
 
-## Initial scope
+## Scope
 
-Keep the first version focused on users, classrooms, one-time bookings, and recurring bookings. Equipment requests and setup/cleanup buffers are out of scope. Start recurring bookings with a simple weekly schedule over a defined date range; defer advanced recurrence rules and per-occurrence edits.
+The system manages the facility's 20 classrooms, external company and individual customers, booking users, and room bookings. It supports searching for available classrooms using date/time, capacity, equipment, and accessibility requirements. It has a console menu and SQL/JDBC persistence. Optional comments are stored on bookings. No other booking policies or features are assumed.
 
 ## System components
 
 ```mermaid
 flowchart LR
-    Client[Web or mobile client]
-    API[Booking API]
-    BookingService[Booking application service]
-    RoomService[Room and availability service]
-    Identity[Identity and access component]
-    Repositories[Persistence repositories]
-    Database[(Relational database)]
-    Notifications[Notification component]
+    Operator[Console user]
+    Menu[Console menu]
+    BookingService[Booking service]
+    RoomService[Room search service]
+    CustomerService[Customer service]
+    BookingRepo[Booking repository]
+    RoomRepo[Classroom repository]
+    CustomerRepo[Customer repository]
+    JDBC[JDBC implementations]
+    Database[(SQL database)]
 
-    Client --> API
-    API --> Identity
-    API --> BookingService
-    BookingService --> RoomService
-    BookingService --> Repositories
-    RoomService --> Repositories
-    Repositories --> Database
-    BookingService -. booking updates .-> Notifications
+    Operator --> Menu
+    Menu --> BookingService
+    Menu --> RoomService
+    Menu --> CustomerService
+    BookingService --> BookingRepo
+    BookingService --> RoomRepo
+    BookingService --> CustomerRepo
+    RoomService --> RoomRepo
+    RoomService --> BookingRepo
+    CustomerService --> CustomerRepo
+    BookingRepo --> JDBC
+    RoomRepo --> JDBC
+    CustomerRepo --> JDBC
+    JDBC --> Database
 ```
 
 | Component | Responsibility |
 | --- | --- |
-| Web or mobile client | Lets users find rooms, view availability, and create or manage bookings. |
-| Booking API | Validates requests at the system boundary and exposes booking and room operations. |
-| Identity and access | Identifies users and applies role-based permissions (for example, requester and administrator). |
-| Booking application service | Coordinates booking creation, cancellation, and status changes. |
-| Room and availability service | Finds rooms and checks whether a requested time interval is available. |
-| Persistence repositories | Load and store users, rooms, and bookings without exposing database details to the domain. |
-| Notification component | Sends booking confirmations or status updates; it can be integrated after the core booking flow. |
+| Console menu | Reads commands and input, invokes application services, and displays results. |
+| Booking service | Validates booking rules, links the customer and booking user, and coordinates persistence. |
+| Room search service | Filters the 20 managed classrooms by time, capacity, equipment, accessibility, and booking conflicts. |
+| Customer service | Registers and retrieves company or individual customers. |
+| Repository interfaces | Abstract SQL persistence so application and domain code do not depend on JDBC details. |
+| JDBC repositories | Implement repository operations using JDBC and parameterized SQL. |
+| SQL database | Stores customers, booking users, classrooms, equipment, and bookings. |
 
 ## Core class diagram
 
 ```mermaid
 classDiagram
-    class User {
-        +UUID id
-        +String name
-        +String email
-        +UserRole role
-        +isActive() boolean
+    class Customer {
+        <<abstract>>
+        -UUID id
+        -String contactName
+        -String email
+        -String phone
+        +getDisplayName() String
     }
 
-    class UserRole {
-        <<enumeration>>
-        REQUESTER
-        ADMINISTRATOR
+    class CompanyCustomer {
+        -String companyName
+        -String registrationNumber
+        +getDisplayName() String
+    }
+
+    class IndividualCustomer {
+        -String firstName
+        -String lastName
+        +getDisplayName() String
+    }
+
+    class BookingUser {
+        -UUID id
+        -String name
+        -String email
+        +getId() UUID
     }
 
     class Classroom {
-        +UUID id
-        +String name
-        +String building
-        +int capacity
-        +String location
-        +boolean active
-        +canAccommodate(int attendees) boolean
+        -UUID id
+        -String name
+        -int seatingCapacity
+        -Set~Equipment~ equipment
+        -boolean accessible
+        +meetsRequirements(RoomRequirements) boolean
+    }
+
+    class Equipment {
+        <<enumeration>>
+        PROJECTOR
+        WHITEBOARD
+        VIDEO_CONFERENCING
+        COMPUTER
+    }
+
+    class RoomRequirements {
+        +int requiredCapacity
+        +Set~Equipment~ requiredEquipment
+        +boolean accessibilityRequired
     }
 
     class Booking {
-        +UUID id
-        +UUID seriesId
-        +UUID requesterId
-        +UUID classroomId
-        +LocalDateTime startsAt
-        +LocalDateTime endsAt
-        +int attendees
-        +BookingStatus status
-        +String purpose
-        +cancel()
+        -UUID id
+        -LocalDateTime startsAt
+        -LocalDateTime endsAt
+        -String comments
         +overlaps(LocalDateTime start, LocalDateTime end) boolean
     }
 
-    class BookingSeries {
-        +UUID id
-        +UUID requesterId
+    class BookingRequest {
+        +UUID customerId
+        +UUID bookingUserId
         +UUID classroomId
-        +LocalDate startsOn
-        +LocalDate endsOn
-        +LocalTime startsAt
-        +LocalTime endsAt
-        +int interval
-        +Set~DayOfWeek~ daysOfWeek
-        +SeriesStatus status
-        +generateOccurrences() List~Booking~
-        +cancel()
+        +LocalDateTime startsAt
+        +LocalDateTime endsAt
+        +RoomRequirements requirements
+        +String comments
     }
 
-    class SeriesStatus {
-        <<enumeration>>
-        ACTIVE
-        CANCELLED
-    }
-
-    class BookingStatus {
-        <<enumeration>>
-        CONFIRMED
-        CANCELLED
+    class ConsoleMenu {
+        +run() void
+        -registerCustomer() void
+        -manageClassrooms() void
+        -createBooking() void
+        -searchAvailableRooms() void
+        -showUpcomingBookings() void
     }
 
     class BookingService {
-        +createBooking(CreateBookingCommand) Booking
-        +cancelBooking(UUID bookingId, UUID actorId) void
-        +getBookingsForUser(UUID userId) List~Booking~
+        +createBooking(BookingRequest) Booking
+        +findUpcomingByRoom(UUID classroomId) List~Booking~
+        +findUpcomingByCustomer(UUID customerId) List~Booking~
+        +findAllUpcoming() List~Booking~
     }
 
-    class AvailabilityService {
-        +isAvailable(UUID classroomId, LocalDateTime start, LocalDateTime end) boolean
-        +findAvailableClassrooms(LocalDateTime start, LocalDateTime end, int attendees) List~Classroom~
+    class RoomSearchService {
+        +findAvailableRooms(RoomRequirements, LocalDateTime, LocalDateTime) List~Classroom~
     }
 
-    class UserRepository {
+    class CustomerService {
+        +registerCustomer(Customer) Customer
+    }
+
+    class CustomerRepository {
         <<interface>>
-        +findById(UUID id) Optional~User~
+        +save(Customer) Customer
+        +findById(UUID) Optional~Customer~
+        +findAll() List~Customer~
+        +update(Customer) void
+        +deleteById(UUID) void
     }
 
     class ClassroomRepository {
         <<interface>>
-        +findById(UUID id) Optional~Classroom~
-        +findActive() List~Classroom~
+        +save(Classroom) Classroom
+        +findAll() List~Classroom~
+        +update(Classroom) void
+        +deleteById(UUID) void
     }
 
     class BookingRepository {
         <<interface>>
         +save(Booking) Booking
-        +findById(UUID id) Optional~Booking~
-        +existsOverlappingBooking(UUID classroomId, LocalDateTime start, LocalDateTime end) boolean
-        +existsOverlappingBookingForRequester(UUID requesterId, LocalDateTime start, LocalDateTime end) boolean
-        +findByRequesterId(UUID requesterId) List~Booking~
+        +findUpcoming() List~Booking~
+        +findUpcomingByRoom(UUID classroomId) List~Booking~
+        +findOverlapping(UUID classroomId, LocalDateTime start, LocalDateTime end) List~Booking~
+        +findByCustomer(UUID customerId) List~Booking~
+        +update(Booking) void
     }
 
-    User --> UserRole
-    Booking --> BookingStatus
-    BookingSeries --> SeriesStatus
-    User "1" --> "0..*" Booking : requests
-    Classroom "1" --> "0..*" Booking : reserved by
-    User "1" --> "0..*" BookingSeries : creates
-    Classroom "1" --> "0..*" BookingSeries : scheduled for
-    BookingSeries "1" *--> "1..*" Booking : generates occurrences
-    BookingService --> UserRepository
-    BookingService --> ClassroomRepository
+    class JdbcCustomerRepository
+    class JdbcClassroomRepository
+    class JdbcBookingRepository
+
+    Customer <|-- CompanyCustomer
+    Customer <|-- IndividualCustomer
+    Classroom o-- Equipment
+    RoomRequirements o-- Equipment
+    Customer "1" <-- "0..*" Booking : customer
+    BookingUser "1" <-- "0..*" Booking : created by
+    Classroom "1" <-- "0..*" Booking : reserves
+    ConsoleMenu --> BookingService
+    ConsoleMenu --> RoomSearchService
+    ConsoleMenu --> CustomerService
+    BookingService --> BookingRequest
     BookingService --> BookingRepository
-    BookingService --> AvailabilityService
-    AvailabilityService --> ClassroomRepository
-    AvailabilityService --> BookingRepository
+    BookingService --> CustomerRepository
+    BookingService --> ClassroomRepository
+    RoomSearchService --> ClassroomRepository
+    RoomSearchService --> BookingRepository
+    JdbcCustomerRepository ..|> CustomerRepository
+    JdbcClassroomRepository ..|> ClassroomRepository
+    JdbcBookingRepository ..|> BookingRepository
 ```
 
-## Booking creation flow
+`CompanyCustomer` and `IndividualCustomer` specialize the abstract `Customer` type and implement `getDisplayName()` polymorphically. Entity fields are private and exposed through validated constructors and accessors. Repository interfaces provide abstraction over JDBC implementations.
+
+## Console booking flow
 
 ```mermaid
 sequenceDiagram
-    actor Requester
-    participant API as Booking API
+    actor Operator
+    participant Menu as ConsoleMenu
+    participant Search as RoomSearchService
     participant Service as BookingService
-    participant Availability as AvailabilityService
     participant Rooms as ClassroomRepository
     participant Bookings as BookingRepository
+    participant Customers as CustomerRepository
 
-    Requester->>API: Request room and time slot
-    API->>Service: createBooking(command, requesterId)
-    Service->>Rooms: Find active classroom
-    Rooms-->>Service: Classroom
-    Service->>Service: Validate time range and capacity
-    Service->>Availability: Check classroom availability
-    Availability->>Bookings: Check overlapping active booking
-    Bookings-->>Availability: Available / conflict
-    Availability-->>Service: Availability result
-    alt Valid and available
-        Service->>Bookings: Save confirmed booking
+    Operator->>Menu: Enter date, time, requirements
+    Menu->>Search: findAvailableRooms(requirements, interval)
+    Search->>Rooms: findAll()
+    Rooms-->>Search: Classrooms
+    Search->>Bookings: findOverlapping(room, interval)
+    Bookings-->>Search: Existing bookings
+    Search-->>Menu: Matching available rooms
+    Operator->>Menu: Select room and customer; enter comments
+    Menu->>Service: createBooking(booking request)
+    Service->>Customers: find customer
+    Service->>Rooms: find selected room
+    Service->>Bookings: Check for room booking conflicts
+    alt Requirements and availability valid
+        Service->>Bookings: Save booking
         Bookings-->>Service: Saved booking
-        Service-->>API: Booking
-        API-->>Requester: Booking confirmation
-    else Invalid, unavailable, or unauthorized
-        Service-->>API: Domain error
-        API-->>Requester: Explain why request failed
+        Service-->>Menu: Confirmed booking
+        Menu-->>Operator: Display confirmation
+    else Invalid or conflicting request
+        Service-->>Menu: Booking validation error
+        Menu-->>Operator: Display reason
     end
 ```
 
-## Initial business rules
+## SQL and JDBC design
 
-1. A booking is confirmed immediately when created successfully; administrator approval is not required.
-2. A booking can be made no more than 7 days before it starts.
-3. A booking must have a start time before its end time.
-4. The classroom must be active and have capacity for the requested attendee count.
-5. A room cannot have overlapping bookings that are not cancelled. Adjacent intervals are allowed (for example, 10:00–11:00 and 11:00–12:00).
-6. A requester cannot have overlapping active bookings, even when the bookings are for different rooms. Adjacent bookings are allowed.
-7. A recurring booking creates individual booking occurrences according to its recurrence pattern. Each occurrence becomes a confirmed booking when it enters the 7-day booking window and passes room availability, capacity, and requester conflict checks.
-8. Cancellation is an optional action: a requester may cancel their own booking, and administrators may manage any booking. No 24-hour cancellation cutoff is specified.
-9. Room availability, requester availability, and booking creation must be checked transactionally, or protected by a database constraint/locking strategy, to avoid conflicting simultaneous requests.
+Use normalized tables: `customers` (with a customer type and type-specific fields), `booking_users`, `classrooms`, `classroom_equipment`, and `bookings`. Seed the database with the facility's 20 classrooms and allow them to be managed through the classroom repository. Store booking references as foreign keys to customer, booking user, and classroom. Store optional comments as nullable text. A booking's capacity, equipment, and accessibility requirements are used to select and validate a suitable classroom; the booked room itself has its own equipment and accessibility attributes.
+
+Repository interfaces isolate SQL operations from services. `JdbcCustomerRepository`, `JdbcClassroomRepository`, and `JdbcBookingRepository` own JDBC connections/statements and map rows to domain objects. Use prepared statements, try-with-resources, transactions when checking availability and saving, and translate `SQLException` into an application-level persistence exception. SQL constraints and transactions should help protect against overlapping bookings.
+
+Repository methods cover insert (`save`), update (`update`), delete where appropriate (`deleteById` for customers/classrooms), and retrieval (`findById`, `findAll`, and booking queries).
+
+## Console menu and collections
+
+The console menu provides options to register a company or individual customer, manage classrooms, search rooms, create a booking, list upcoming bookings by room/customer, and list all upcoming bookings. Keep parsing and display in the console layer; booking and search rules belong in services/domain classes.
+
+Room search can load candidate classrooms and use streams to filter by `seatingCapacity >= requiredCapacity`, equipment inclusion, accessibility, and absence of an overlapping booking. Upcoming-booking views filter future bookings and sort by start time. Use collections such as `Set<Equipment>` for room equipment and `List<Booking>` for results; keep SQL-backed retrieval in repositories and use streams for in-memory domain filtering/sorting.
+
+## Implementation quality
+
+Use focused domain, service, repository, and console classes. Encapsulate mutable state behind constructors and methods; use the `Customer` abstraction with company/individual implementations for polymorphism; model booking-to-customer, booking-user, and classroom relationships explicitly. Validate input and business rules with meaningful domain exceptions, and report recoverable input or persistence errors in the console without exposing SQL details. Add purpose-oriented class and method comments, especially around booking conflict checks.
+
+## Business rules
+
+1. A booking records its date/time range, customer, booking user, and selected classroom; comments are optional. Required capacity and equipment are supplied as booking criteria.
+2. The selected classroom must meet the required capacity, equipment, and accessibility criteria.
+3. A classroom cannot be double-booked during overlapping time ranges.
+4. A booking is linked to exactly one customer, one booking user who created it, and one classroom.
+5. Available-room search considers the requested time range and classroom capacity, equipment, and accessibility.
+6. Upcoming booking lists are available for a classroom, a customer, and the whole system, ordered by scheduled time.
+7. Availability checking and booking persistence must be transactionally protected to avoid conflicting simultaneous requests for the same room.
+8. Optional comments are stored with the booking and are not required to create one.
 
 ## Open decisions
 
-- Should recurring bookings later support additional patterns (for example, monthly schedules), excluded dates, or editing a single occurrence?
-- Which identity provider and user roles should be supported?
-- What are the timezone and opening-hours policies?
-- Should notifications be email, in-app, or both?
+- Which SQL database and JDBC driver should be used?
