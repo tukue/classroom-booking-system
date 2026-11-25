@@ -102,7 +102,7 @@ flowchart TB
 ```mermaid
 erDiagram
     CUSTOMERS {
-        bigint customer_id PK
+        uuid customer_id PK
         varchar customer_type
         varchar display_name
         varchar email
@@ -114,35 +114,35 @@ erDiagram
     }
 
     BOOKING_USERS {
-        bigint booking_user_id PK
+        uuid booking_user_id PK
         varchar name
         varchar email
     }
 
     CLASSROOMS {
-        bigint classroom_id PK
+        uuid classroom_id PK
         varchar name
         int seating_capacity
         boolean accessible
     }
 
     EQUIPMENT {
-        bigint equipment_id PK
+        uuid equipment_id PK
         varchar name UK
     }
 
     CLASSROOM_EQUIPMENT {
-        bigint classroom_id PK, FK
-        bigint equipment_id PK, FK
+        uuid classroom_id PK, FK
+        uuid equipment_id PK, FK
     }
 
     BOOKINGS {
-        bigint booking_id PK
-        bigint customer_id FK
-        bigint booking_user_id FK
-        bigint classroom_id FK
-        timestamp starts_at
-        timestamp ends_at
+        uuid booking_id PK
+        uuid customer_id FK
+        uuid booking_user_id FK
+        uuid classroom_id FK
+        timestamptz starts_at
+        timestamptz ends_at
         text comments
     }
 
@@ -153,8 +153,19 @@ erDiagram
     EQUIPMENT ||--o{ CLASSROOM_EQUIPMENT : assigned_to
 ```
 
-`CLASSROOM_EQUIPMENT` represents the many-to-many relationship between rooms and equipment. A booking references exactly one customer, one booking user, and one classroom. Equipment and accessibility requirements are matched against classroom data when searching and validating the booking. The initial database data contains the facility's 20 classrooms; the classroom table is not constrained to exactly 20 rows so the inventory can be managed.
+`CLASSROOM_EQUIPMENT` represents the many-to-many relationship between rooms and equipment. A booking references exactly one customer, one booking user, and one classroom. Equipment and accessibility requirements are matched against classroom data when searching and validating the booking. The classroom table is not constrained to exactly 20 rows so the inventory can be managed. `src/main/resources/db/seed.sql` currently contains clearly labeled demonstration room attributes because the facility's verified inventory was not included in the requirements; replace them when the actual inventory is provided.
 
 The application uses PostgreSQL through the PostgreSQL JDBC driver. Docker Compose runs the database and stores its data in the named `classroom-booking-data` volume. Copy `.env.example` to `.env` to customize local connection settings, then start/stop the database with `docker compose up -d database` and `docker compose down`.
 
-From the Java application running on the host, the default JDBC URL is `jdbc:postgresql://localhost:5432/classroom_booking`. The database service is health-checked before use.
+From the Java application running on the host, the default JDBC URL is `jdbc:postgresql://localhost:5433/classroom_booking`. `DatabaseManager` reads `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` from the process environment; `JDBC_URL` can override the generated URL. In WSL, load local settings with `set -a && source .env && set +a` before running Maven. The database service is health-checked before use.
+
+To initialize the schema and run the console readiness check from WSL:
+
+```bash
+docker compose up -d database
+set -a && source .env && set +a
+mvn compile exec:java
+```
+
+Run the PostgreSQL integration check with `mvn -Ddb.integration=true verify` while the database is running.
+That verification also enforces at least 90% line coverage and writes the report to `target/site/jacoco/index.html`.

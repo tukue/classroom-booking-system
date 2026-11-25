@@ -7,7 +7,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 - Use PostgreSQL as the relational database, the PostgreSQL JDBC driver in Maven, and Docker Compose for the local database service.
 - Copy `.env.example` to `.env` when local connection settings need customization; `.env` is ignored by Git.
 - Agree on the equipment values used by the facility (for example, projector and whiteboard).
-- Add meaningful automated tests as each feature is implemented; use JDBC integration tests for database behavior.
+- Add meaningful automated tests as each feature is implemented; use JDBC integration tests for database behavior and keep line coverage at or above 90%.
 - Keep the View responsible for console input/output, the Controller responsible for coordinating a user action, and the Model responsible for domain rules and persistence-facing use cases.
 
 ## Feature sequence
@@ -16,19 +16,19 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Branch:** `feature/database-foundation`
 
-- Add database configuration and JDBC connection management.
+- Add environment-based PostgreSQL configuration and JDBC connection management.
 - Add `docker-compose.yml` for the PostgreSQL service and persistent named volume.
 - Implement `DatabaseManager` as the single JDBC connection factory, returning a fresh connection per operation/transaction; pass it to JDBC repositories at startup.
-- Create schema initialization for customers, booking users, classrooms, equipment, classroom-equipment links, and bookings.
-- Seed the 20 known classrooms and their capacity, equipment, and accessibility data when that inventory is available.
+- Create idempotent schema initialization for customers, booking users, classrooms, equipment, classroom-equipment links, and bookings with primary keys, foreign keys, checks, and room/time overlap protection.
+- Seed 20 demonstration classrooms with varied capacity/equipment/accessibility; replace these placeholders with verified facility data when supplied.
 
-**Model:** define the minimum database configuration/connection abstractions and repository interfaces needed by the domain.
+**Model:** define customer, booking user, classroom, equipment, room requirements, and booking records plus focused repository interfaces and a connection-factory abstraction.
 
-**Controller:** wire dependencies during application startup; do not put SQL logic in controllers.
+**Controller:** wire the database initializer and connection factory during application startup; do not put SQL logic in controllers.
 
 **View:** add a minimal console startup/error message for database readiness.
 
-**Done when:** schema initialization can be run repeatedly without duplicating seed data; a database integration check can connect and read the seeded classrooms; JDBC resources are closed correctly.
+**Done when:** schema initialization can be run repeatedly without duplicating seed data; an integration check can connect and read all 20 seeded classrooms and their room-equipment relationships; JDBC resources are closed correctly.
 
 ### 2. Customer registration
 
