@@ -12,6 +12,7 @@ import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingScheduleRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
+import com.classroombooking.presentation.console.BookingScheduleController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.CustomerController;
 import com.classroombooking.presentation.console.ConsoleView;
@@ -27,6 +28,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -289,6 +291,17 @@ class DatabaseIntegrationTest {
                     previousPosition = position;
                 }
                 assertTrue(!allUpcoming.contains(past.toString()), allUpcoming);
+
+                var scheduleOnlyOutput = new ByteArrayOutputStream();
+                try (var output = new PrintStream(scheduleOnlyOutput, true, StandardCharsets.UTF_8)) {
+                    var view = new ConsoleView(new ByteArrayInputStream("9\n0\n".getBytes(StandardCharsets.UTF_8)), output);
+                    var customers = new CustomerController(new CustomerService(new JdbcCustomerRepository(database)));
+                    var schedules = new BookingScheduleController(repository, Clock.fixed(cutoff.toInstant(), ZoneOffset.UTC));
+                    new ConsoleMenu(null, customers, schedules, view).run();
+                }
+                String scheduleOnly = scheduleOnlyOutput.toString(StandardCharsets.UTF_8);
+                assertTrue(scheduleOnly.contains("9. View all upcoming bookings"), scheduleOnly);
+                assertBookingOutput(scheduleOnly, roomFirst, unrelated, past);
                 assertBookingOutput(runScheduleOption(7, room), roomFirst, roomLast, customerFirst, past, unrelated);
                 assertBookingOutput(runScheduleOption(8, customer), customerFirst, roomLast, roomFirst, past, unrelated);
                 assertTrue(runScheduleOption(7, UUID.randomUUID()).contains("Classroom not found."));

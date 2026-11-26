@@ -44,9 +44,11 @@ public final class ConsoleView {
             output.println("5. Update classroom");
             output.println("6. Delete classroom");
         }
-        if (bookingSchedulesEnabled) {
+        if (classroomsEnabled && bookingSchedulesEnabled) {
             output.println("7. View upcoming bookings by classroom");
             output.println("8. View upcoming bookings by customer");
+        }
+        if (bookingSchedulesEnabled) {
             output.println("9. View all upcoming bookings");
         }
         output.println("0. Exit");

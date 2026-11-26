@@ -32,7 +32,7 @@ public final class ConsoleMenu {
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice(classroomController != null, hasBookingSchedules());
+            int choice = view.readMenuChoice(classroomController != null, bookingSchedule != null);
             try {
                 switch (choice) {
                     case 0 -> {
@@ -63,7 +63,7 @@ public final class ConsoleMenu {
     }
 
     private void showAllUpcomingBookings() {
-        if (!hasBookingSchedules()) {
+        if (bookingSchedule == null) {
             view.showError("Choose one of the listed menu options.");
             return;
         }
