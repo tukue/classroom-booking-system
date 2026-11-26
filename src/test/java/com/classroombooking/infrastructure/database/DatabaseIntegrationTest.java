@@ -2,6 +2,7 @@ package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.CompanyCustomer;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
@@ -113,6 +114,28 @@ class DatabaseIntegrationTest {
             } finally {
                 connection.rollback();
             }
+        }
+    }
+
+    @Test
+    void customerRepositoryReturnsSafeMessageForDatabaseConstraintErrors() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+        CustomerRepository repository = new JdbcCustomerRepository(databaseManager);
+        String email = "safe-error-" + UUID.randomUUID() + "@example.test";
+        Customer customer = new CompanyCustomer(UUID.randomUUID(), "Example Customer", email);
+
+        repository.save(customer);
+        try {
+            PersistenceException exception = assertThrows(PersistenceException.class,
+                    () -> repository.save(new IndividualCustomer(UUID.randomUUID(),
+                            "Duplicate Customer", email)));
+
+            assertEquals("Customer could not be saved. Please try again.", exception.getMessage());
+            assertTrue(exception.getCause() instanceof SQLException);
+            assertTrue(!exception.getMessage().contains("customers_email_key"));
+        } finally {
+            repository.deleteById(customer.id());
         }
     }
 

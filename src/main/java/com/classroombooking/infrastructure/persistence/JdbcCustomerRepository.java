@@ -1,5 +1,6 @@
 package com.classroombooking.infrastructure.persistence;
 
+import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.CompanyCustomer;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
@@ -15,9 +16,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** JDBC implementation of customer persistence operations. */
 public final class JdbcCustomerRepository implements CustomerRepository {
+    private static final Logger LOGGER = Logger.getLogger(JdbcCustomerRepository.class.getName());
     private final ConnectionFactory connectionFactory;
 
     public JdbcCustomerRepository(ConnectionFactory connectionFactory) {
@@ -37,7 +41,7 @@ public final class JdbcCustomerRepository implements CustomerRepository {
             statement.executeUpdate();
             return customer;
         } catch (SQLException exception) {
-            throw new PersistenceException("Could not save customer: " + exception.getMessage(), exception);
+            throw persistenceFailure("Customer could not be saved. Please try again.", exception);
         }
     }
 
@@ -52,7 +56,7 @@ public final class JdbcCustomerRepository implements CustomerRepository {
                 return resultSet.next() ? Optional.of(mapCustomer(resultSet)) : Optional.empty();
             }
         } catch (SQLException exception) {
-            throw new PersistenceException("Could not find customer: " + exception.getMessage(), exception);
+            throw persistenceFailure("Customer could not be retrieved. Please try again.", exception);
         }
     }
 
@@ -69,7 +73,7 @@ public final class JdbcCustomerRepository implements CustomerRepository {
             }
             return List.copyOf(customers);
         } catch (SQLException exception) {
-            throw new PersistenceException("Could not list customers: " + exception.getMessage(), exception);
+            throw persistenceFailure("Customers could not be listed. Please try again.", exception);
         }
     }
 
@@ -84,10 +88,10 @@ public final class JdbcCustomerRepository implements CustomerRepository {
             statement.setString(3, customer.email());
             statement.setObject(4, customer.id());
             if (statement.executeUpdate() == 0) {
-                throw new PersistenceException("Customer was not found: " + customer.id(), null);
+                throw new PersistenceException("Customer was not found.", null);
             }
         } catch (SQLException exception) {
-            throw new PersistenceException("Could not update customer: " + exception.getMessage(), exception);
+            throw persistenceFailure("Customer could not be updated. Please try again.", exception);
         }
     }
 
@@ -99,7 +103,7 @@ public final class JdbcCustomerRepository implements CustomerRepository {
             statement.setObject(1, customerId);
             statement.executeUpdate();
         } catch (SQLException exception) {
-            throw new PersistenceException("Could not delete customer: " + exception.getMessage(), exception);
+            throw persistenceFailure("Customer could not be deleted. Please try again.", exception);
         }
     }
 
@@ -110,7 +114,7 @@ public final class JdbcCustomerRepository implements CustomerRepository {
         return switch (resultSet.getString("customer_type")) {
             case "COMPANY" -> new CompanyCustomer(id, name, email);
             case "INDIVIDUAL" -> new IndividualCustomer(id, name, email);
-            default -> throw new IllegalStateException("Unknown customer type in database.");
+            default -> throw new SQLException("Unknown customer type in database.");
         };
     }
 
@@ -122,5 +126,10 @@ public final class JdbcCustomerRepository implements CustomerRepository {
             return "INDIVIDUAL";
         }
         throw new IllegalArgumentException("Unsupported customer type: " + customer.getClass().getName());
+    }
+
+    private PersistenceException persistenceFailure(String userMessage, SQLException cause) {
+        LOGGER.log(Level.FINE, userMessage, cause);
+        return new PersistenceException(userMessage, cause);
     }
 }

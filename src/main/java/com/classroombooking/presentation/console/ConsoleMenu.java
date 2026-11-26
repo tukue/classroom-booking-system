@@ -1,7 +1,7 @@
 package com.classroombooking.presentation.console;
 
 import com.classroombooking.domain.model.Customer;
-import com.classroombooking.infrastructure.persistence.PersistenceException;
+import com.classroombooking.application.persistence.PersistenceException;
 
 import java.util.Objects;
 

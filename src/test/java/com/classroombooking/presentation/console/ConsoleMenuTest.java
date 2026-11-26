@@ -1,9 +1,9 @@
 package com.classroombooking.presentation.console;
 
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.repository.CustomerRepository;
-import com.classroombooking.infrastructure.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -61,8 +61,9 @@ class ConsoleMenuTest {
         ConsoleMenu persistenceFailureMenu = menu("1\n2\nPat Customer\npat@example.test\n0\n",
                 persistenceOutput, new InMemoryCustomerRepository(true));
         persistenceFailureMenu.run();
-        assertTrue(persistenceOutput.toString(StandardCharsets.UTF_8)
-                .contains("Could not save customer."));
+        String persistenceMessage = persistenceOutput.toString(StandardCharsets.UTF_8);
+        assertTrue(persistenceMessage.contains("Customer could not be saved. Please try again."));
+        assertTrue(!persistenceMessage.contains("secret_schema"));
     }
 
     private ConsoleMenu menu(String input, ByteArrayOutputStream output,
@@ -88,7 +89,8 @@ class ConsoleMenuTest {
         @Override
         public Customer save(Customer customer) {
             if (failOnSave) {
-                throw new PersistenceException("Could not save customer.", null);
+                throw new PersistenceException("Customer could not be saved. Please try again.",
+                        new IllegalStateException("secret_schema.customers_email_key"));
             }
             customers.add(customer);
             return customer;

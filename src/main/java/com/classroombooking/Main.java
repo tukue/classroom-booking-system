@@ -13,8 +13,12 @@ import java.io.PrintStream;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public final class Main {
+    private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
+
     private Main() {
     }
 
@@ -35,8 +39,11 @@ public final class Main {
         try {
             initializerFactory.get().initialize();
         } catch (SQLException | IOException | IllegalStateException exception) {
-            error.println("Unable to initialize the database. Start PostgreSQL with `docker compose up -d database`.");
-            error.println(exception.getMessage());
+            LOGGER.log(Level.FINE, "Application startup failed.", exception);
+            error.println("Unable to initialize the database. Check its configuration and logs.");
+            if (exception instanceof IllegalStateException) {
+                error.println("Check that POSTGRES_PASSWORD is set in your .env file.");
+            }
             return 1;
         }
         output.println("Classroom Booking System database is ready.");
