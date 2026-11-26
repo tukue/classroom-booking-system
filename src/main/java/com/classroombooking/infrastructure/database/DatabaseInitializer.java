@@ -25,7 +25,16 @@ public final class DatabaseInitializer {
             connection.setAutoCommit(false);
             try {
                 executeScript(connection, "/db/schema.sql");
-                executeScript(connection, "/db/seed.sql");
+                try (Statement statement = connection.createStatement()) {
+                    // The marker and seed commit together, including on concurrent startup.
+                    int inserted = statement.executeUpdate("""
+                            INSERT INTO applied_database_seeds (name) VALUES ('demonstration-inventory')
+                            ON CONFLICT DO NOTHING
+                            """);
+                    if (inserted == 1) {
+                        executeScript(connection, "/db/seed.sql");
+                    }
+                }
                 connection.commit();
             } catch (SQLException | IOException exception) {
                 connection.rollback();
