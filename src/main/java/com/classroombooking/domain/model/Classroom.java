@@ -7,6 +7,13 @@ import java.util.UUID;
 public record Classroom(UUID id, String name, int seatingCapacity, Set<Equipment> equipment,
                         boolean accessible) {
     public Classroom {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Classroom name must not be blank.");
+        }
+        name = name.strip();
+        if (name.codePointCount(0, name.length()) > 100) {
+            throw new IllegalArgumentException("Classroom name must be at most 100 characters.");
+        }
         if (seatingCapacity <= 0) {
             throw new IllegalArgumentException("Seating capacity must be positive.");
         }

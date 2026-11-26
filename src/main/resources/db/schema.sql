@@ -1,5 +1,9 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
+CREATE TABLE IF NOT EXISTS applied_database_seeds (
+    name TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS customers (
     customer_id UUID PRIMARY KEY,
     customer_type VARCHAR(20) NOT NULL CHECK (customer_type IN ('COMPANY', 'INDIVIDUAL')),
