@@ -1,9 +1,18 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
+import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.domain.model.CompanyCustomer;
+import com.classroombooking.domain.model.Customer;
+import com.classroombooking.domain.model.IndividualCustomer;
+import com.classroombooking.domain.repository.CustomerRepository;
+import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,9 +22,11 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @EnabledIfSystemProperty(named = "db.integration", matches = "true")
 class DatabaseIntegrationTest {
@@ -27,7 +38,13 @@ class DatabaseIntegrationTest {
 
         initializer.initialize();
         initializer.initialize();
-        Main.main(new String[0]);
+        InputStream originalInput = System.in;
+        try {
+            System.setIn(new ByteArrayInputStream("0\n".getBytes(StandardCharsets.UTF_8)));
+            Main.main(new String[0]);
+        } finally {
+            System.setIn(originalInput);
+        }
 
         try (Connection first = databaseManager.openConnection();
              Connection second = databaseManager.openConnection()) {
@@ -115,6 +132,39 @@ class DatabaseIntegrationTest {
             } finally {
                 connection.rollback();
             }
+        }
+    }
+
+    @Test
+    void customerRegistrationLoadsUpdatesAndDeletesBothCustomerTypes() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+        CustomerRepository repository = new JdbcCustomerRepository(databaseManager);
+        CustomerService service = new CustomerService(repository);
+        int existingCustomerCount = repository.findAll().size();
+        String suffix = UUID.randomUUID().toString();
+
+        Customer company = service.registerCompany("Acme Ltd", "acme-" + suffix + "@example.test");
+        Customer individual = null;
+        try {
+            individual = service.registerIndividual("Pat Customer", "pat-" + suffix + "@example.test");
+
+            assertInstanceOf(CompanyCustomer.class, repository.findById(company.id()).orElseThrow());
+            assertInstanceOf(IndividualCustomer.class, repository.findById(individual.id()).orElseThrow());
+            assertEquals(existingCustomerCount + 2, service.findAllCustomers().size());
+
+            Customer updatedCompany = new CompanyCustomer(company.id(), "Acme Training Ltd",
+                    "training-" + suffix + "@acme.example.test");
+            repository.update(updatedCompany);
+            assertEquals(updatedCompany, repository.findById(company.id()).orElseThrow());
+
+            repository.deleteById(individual.id());
+            assertTrue(repository.findById(individual.id()).isEmpty());
+        } finally {
+            if (individual != null) {
+                repository.deleteById(individual.id());
+            }
+            repository.deleteById(company.id());
         }
     }
 

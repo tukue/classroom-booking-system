@@ -22,7 +22,7 @@ class MainTest {
         int exitCode;
         try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8);
              PrintStream error = new PrintStream(errorBytes, true, StandardCharsets.UTF_8)) {
-            exitCode = Main.run(() -> initializer, output, error);
+            exitCode = Main.run(() -> initializer, () -> { }, output, error);
         }
 
         assertEquals(1, exitCode);
@@ -41,7 +41,7 @@ class MainTest {
              PrintStream error = new PrintStream(errorBytes, true, StandardCharsets.UTF_8)) {
             exitCode = Main.run(() -> {
                 throw new IllegalStateException("POSTGRES_PASSWORD is required");
-            }, output, error);
+            }, () -> { }, output, error);
         }
 
         assertEquals(1, exitCode);

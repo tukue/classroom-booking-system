@@ -2,7 +2,7 @@
 
 A Java 25 console application for managing classroom availability and bookings for a facility with 20 training rooms. Customers may be companies or individuals. The system is designed to validate classroom capacity, equipment, accessibility, and booking conflicts, and persist data in PostgreSQL through JDBC.
 
-> The repository is being developed one feature at a time. The PostgreSQL/JDBC foundation is implemented; customer registration, classroom management, room search, booking creation, and booking schedule views are tracked in the implementation plan.
+> The repository is being developed one feature at a time. The PostgreSQL/JDBC foundation and customer registration are implemented. Classroom management, room search, booking creation, and booking schedule views remain in the implementation plan.
 
 ## Requirements and design
 

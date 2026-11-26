@@ -12,7 +12,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 ## Feature sequence
 
-### 1. SQL/JDBC foundation
+### 1. SQL/JDBC foundation — implemented
 
 **Branch:** `feature/database-foundation`
 
@@ -30,7 +30,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Done when:** schema initialization can be run repeatedly without duplicating seed data; an integration check can connect and read all 20 seeded classrooms and their room-equipment relationships; JDBC resources are closed correctly.
 
-### 2. Customer registration
+### 2. Customer registration — implemented
 
 **Branch:** `feature/customer-registration`
 
@@ -43,7 +43,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **View:** prompt for company/individual details and display saved customers or validation errors.
 
-**Done when:** both customer types can be registered, saved through JDBC, loaded again, and displayed correctly.
+**Done when:** both customer types can be registered, saved through JDBC, loaded again, and displayed correctly. This feature is implemented and covered by console and JDBC integration tests.
 
 ### 3. Classroom management
 

@@ -1,4 +1,4 @@
-name: Maven build
+name: Maven build and tests
 
 on:
   push:
@@ -44,5 +44,5 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Build with Maven
+      - name: Run unit and PostgreSQL integration tests and build
         run: mvn --batch-mode --no-transfer-progress -Ddb.integration=true verify
