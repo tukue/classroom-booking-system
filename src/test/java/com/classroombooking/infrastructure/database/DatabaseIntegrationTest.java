@@ -20,7 +20,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -52,13 +51,7 @@ class DatabaseIntegrationTest {
 
         initializer.initialize();
         initializer.initialize();
-        InputStream originalInput = System.in;
-        try {
-            System.setIn(new ByteArrayInputStream("0\n".getBytes(StandardCharsets.UTF_8)));
-            Main.main(new String[0]);
-        } finally {
-            System.setIn(originalInput);
-        }
+        assertTrue(runConsole("0\n").contains("Classroom Booking System database is ready."));
 
         try (Connection first = databaseManager.openConnection();
              Connection second = databaseManager.openConnection()) {
@@ -299,17 +292,16 @@ class DatabaseIntegrationTest {
     }
 
     private String runScheduleOption(int option, UUID selection) {
-        InputStream originalInput = System.in;
-        PrintStream originalOutput = System.out;
+        return runConsole(option + "\n" + selection + "\n0\n");
+    }
+
+    private String runConsole(String commands) {
+        var input = new ByteArrayInputStream(commands.getBytes(StandardCharsets.UTF_8));
         var output = new ByteArrayOutputStream();
-        try (var capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
-            String input = option + "\n" + selection + "\n0\n";
-            System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
-            System.setOut(capture);
-            Main.main(new String[0]);
-        } finally {
-            System.setIn(originalInput);
-            System.setOut(originalOutput);
+        var errors = new ByteArrayOutputStream();
+        try (var capture = new PrintStream(output, true, StandardCharsets.UTF_8);
+             var error = new PrintStream(errors, true, StandardCharsets.UTF_8)) {
+            assertEquals(0, Main.run(input, capture, error), () -> errors.toString(StandardCharsets.UTF_8));
         }
         return output.toString(StandardCharsets.UTF_8);
     }
