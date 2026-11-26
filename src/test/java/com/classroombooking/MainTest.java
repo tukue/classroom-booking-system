@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MainTest {
@@ -22,13 +23,14 @@ class MainTest {
         int exitCode;
         try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8);
              PrintStream error = new PrintStream(errorBytes, true, StandardCharsets.UTF_8)) {
-            exitCode = Main.run(() -> initializer, output, error);
+            exitCode = Main.run(() -> initializer, () -> { }, output, error);
         }
 
         assertEquals(1, exitCode);
         assertEquals("", outputBytes.toString(StandardCharsets.UTF_8));
-        assertTrue(errorBytes.toString(StandardCharsets.UTF_8)
-                .contains("Unable to initialize the database"));
+        String errorOutput = errorBytes.toString(StandardCharsets.UTF_8);
+        assertTrue(errorOutput.contains("Unable to initialize the database"));
+        assertFalse(errorOutput.contains("database unavailable"));
     }
 
     @Test
@@ -41,11 +43,11 @@ class MainTest {
              PrintStream error = new PrintStream(errorBytes, true, StandardCharsets.UTF_8)) {
             exitCode = Main.run(() -> {
                 throw new IllegalStateException("POSTGRES_PASSWORD is required");
-            }, output, error);
+            }, () -> { }, output, error);
         }
 
         assertEquals(1, exitCode);
         assertTrue(errorBytes.toString(StandardCharsets.UTF_8)
-                .contains("POSTGRES_PASSWORD is required"));
+                .contains("POSTGRES_PASSWORD is set in your .env file"));
     }
 }
