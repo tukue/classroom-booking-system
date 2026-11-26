@@ -42,7 +42,7 @@ public final class JdbcBookingAvailabilityRepository implements BookingAvailabil
             }
             return List.copyOf(bookings);
         } catch (SQLException exception) {
-            LOGGER.log(Level.FINE, "Could not check classroom booking overlaps.", exception);
+            LOGGER.log(Level.WARNING, "Could not check classroom booking overlaps.", exception);
             throw new PersistenceException("Room availability could not be checked. Please try again.",
                     exception);
         }

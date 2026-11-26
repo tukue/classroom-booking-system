@@ -147,10 +147,10 @@ public final class ConsoleMenu {
     private void searchAvailableClassrooms() {
         String startsAt = view.readText("Start time (ISO-8601 with offset): ");
         String endsAt = view.readText("End time (ISO-8601 with offset): ");
-        int capacity = view.readInteger("Required capacity: ");
         if (startsAt == null || endsAt == null) {
             return;
         }
+        int capacity = view.readInteger("Required capacity: ");
         view.showEquipmentOptions(roomSearchController.findAllEquipment());
         String requiredEquipment = view.readText("Required equipment (comma-separated, optional): ");
         if (requiredEquipment == null) {

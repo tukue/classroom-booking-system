@@ -289,6 +289,17 @@ class DatabaseIntegrationTest {
         }
     }
 
+    @Test
+    void classroomLookupHelperReportsMissingSeededRoomClearly() throws Exception {
+        new DatabaseInitializer(DatabaseManager.getInstance()).initialize();
+
+        try (Connection connection = DatabaseManager.getInstance().openConnection()) {
+            IllegalStateException exception = assertThrows(IllegalStateException.class,
+                    () -> findClassroomId(connection, "Missing Training Room"));
+            assertEquals("Classroom not found in seed data: Missing Training Room", exception.getMessage());
+        }
+    }
+
     private void insertCustomer(Connection connection, UUID customerId) throws SQLException {
         insertCustomer(connection, customerId, customerId + "@example.test");
     }
@@ -333,7 +344,9 @@ class DatabaseIntegrationTest {
                 "SELECT classroom_id FROM classrooms WHERE name = ?")) {
             statement.setString(1, classroomName);
             try (ResultSet resultSet = statement.executeQuery()) {
-                resultSet.next();
+                if (!resultSet.next()) {
+                    throw new IllegalStateException("Classroom not found in seed data: " + classroomName);
+                }
                 return resultSet.getObject(1, UUID.class);
             }
         }

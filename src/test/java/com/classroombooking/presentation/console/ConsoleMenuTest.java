@@ -97,6 +97,19 @@ class ConsoleMenuTest {
         assertTrue(!display.contains("Booked Room"));
     }
 
+    @Test
+    void stopsSearchWhenTimeInputEndsBeforeCapacity() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ConsoleMenu menu = menu("3\n2035-04-01T09:00:00Z\n", output,
+                new InMemoryCustomerRepository());
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(!display.contains("Required capacity:"));
+        assertTrue(display.contains("Goodbye."));
+    }
+
     private ConsoleMenu menu(String input, ByteArrayOutputStream output,
                               InMemoryCustomerRepository repository) {
         return menu(input, output, repository, List.of(), List.of(),
