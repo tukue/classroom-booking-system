@@ -20,6 +20,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -70,7 +71,8 @@ class ClassroomManagementIntegrationTest {
                     .findFirst().orElseThrow();
             assertEquals(18, created.seatingCapacity());
             assertTrue(created.accessible());
-            assertEquals(Set.copyOf(new JdbcEquipmentRepository(database).findAll()), created.equipment());
+            assertEquals(Set.of("WHITEBOARD", "PROJECTOR"),
+                    created.equipment().stream().map(Equipment::name).collect(Collectors.toSet()));
             assertEquals(new Classroom(edited.id(), edited.name(), 42, Set.of(), false),
                     reloaded.findById(edited.id()).orElseThrow());
             assertTrue(reloaded.findById(deleted.id()).isEmpty());
