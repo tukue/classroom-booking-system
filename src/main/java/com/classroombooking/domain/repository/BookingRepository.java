@@ -14,6 +14,4 @@ public interface BookingRepository extends BookingScheduleRepository {
     Optional<Booking> findById(UUID bookingId);
 
     List<Booking> findOverlapping(UUID classroomId, OffsetDateTime startsAt, OffsetDateTime endsAt);
-
-    List<Booking> findAllUpcoming(OffsetDateTime from);
 }

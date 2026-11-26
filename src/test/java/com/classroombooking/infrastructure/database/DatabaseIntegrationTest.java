@@ -237,7 +237,7 @@ class DatabaseIntegrationTest {
     }
 
     @Test
-    void bookingViewsShowOnlyUpcomingBookingsForTheSelectedRoomOrCustomer() throws Exception {
+    void bookingViewsShowUpcomingBookingsInOrderWithTheRequestedScope() throws Exception {
         DatabaseManager database = DatabaseManager.getInstance();
         new DatabaseInitializer(database).initialize();
         var classrooms = new JdbcClassroomRepository(database);
@@ -277,6 +277,18 @@ class DatabaseIntegrationTest {
                         repository.findUpcomingByCustomer(customer, cutoff).stream().map(Booking::id).toList());
                 assertEquals(List.of(), repository.findUpcomingByClassroom(UUID.randomUUID(), cutoff));
 
+                List<UUID> expected = List.of(roomFirst, customerFirst, roomLast, unrelated);
+                assertEquals(expected, repository.findAllUpcoming(tomorrow).stream()
+                        .filter(booking -> booking.bookingUserId().equals(bookingUser)).map(Booking::id).toList());
+
+                String allUpcoming = runConsole("9\n0\n");
+                int previousPosition = -1;
+                for (UUID id : expected) {
+                    int position = allUpcoming.indexOf(id.toString());
+                    assertTrue(position > previousPosition, allUpcoming);
+                    previousPosition = position;
+                }
+                assertTrue(!allUpcoming.contains(past.toString()), allUpcoming);
                 assertBookingOutput(runScheduleOption(7, room), roomFirst, roomLast, customerFirst, past, unrelated);
                 assertBookingOutput(runScheduleOption(8, customer), customerFirst, roomLast, roomFirst, past, unrelated);
                 assertTrue(runScheduleOption(7, UUID.randomUUID()).contains("Classroom not found."));

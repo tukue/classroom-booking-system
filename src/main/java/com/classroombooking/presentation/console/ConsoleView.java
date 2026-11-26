@@ -47,6 +47,7 @@ public final class ConsoleView {
         if (bookingSchedulesEnabled) {
             output.println("7. View upcoming bookings by classroom");
             output.println("8. View upcoming bookings by customer");
+            output.println("9. View all upcoming bookings");
         }
         output.println("0. Exit");
         return readInteger("Choose an option: ");

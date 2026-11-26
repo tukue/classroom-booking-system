@@ -32,7 +32,7 @@ public final class ConsoleMenu {
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice(classroomController != null, bookingSchedule != null && classroomController != null);
+            int choice = view.readMenuChoice(classroomController != null, hasBookingSchedules());
             try {
                 switch (choice) {
                     case 0 -> {
@@ -43,6 +43,7 @@ public final class ConsoleMenu {
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
                     case 7 -> showClassroomBookings();
                     case 8 -> showCustomerBookings();
+                    case 9 -> showAllUpcomingBookings();
                     default -> {
                         if (classroomController == null) {
                             view.showError("Choose one of the listed menu options.");
@@ -57,8 +58,20 @@ public final class ConsoleMenu {
         }
     }
 
+    private boolean hasBookingSchedules() {
+        return bookingSchedule != null && classroomController != null;
+    }
+
+    private void showAllUpcomingBookings() {
+        if (!hasBookingSchedules()) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        view.showBookings(bookingSchedule.allUpcoming());
+    }
+
     private void showClassroomBookings() {
-        if (bookingSchedule == null || classroomController == null) {
+        if (!hasBookingSchedules()) {
             view.showError("Choose one of the listed menu options.");
             return;
         }
@@ -76,7 +89,7 @@ public final class ConsoleMenu {
     }
 
     private void showCustomerBookings() {
-        if (bookingSchedule == null || classroomController == null) {
+        if (!hasBookingSchedules()) {
             view.showError("Choose one of the listed menu options.");
             return;
         }

@@ -9,14 +9,16 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class JdbcBookingScheduleRepository implements BookingScheduleRepository {
     private static final String SELECT = """
             SELECT booking_id, customer_id, booking_user_id, classroom_id, starts_at, ends_at, comments
             FROM bookings
+            WHERE starts_at >= ?
             """;
-    private static final String UPCOMING = " AND starts_at >= ? ORDER BY starts_at, booking_id";
+    private static final String START_TIME_ORDER = " ORDER BY starts_at, booking_id";
 
     private final ConnectionFactory connections;
 
@@ -25,20 +27,27 @@ public final class JdbcBookingScheduleRepository implements BookingScheduleRepos
     }
 
     @Override
+    public List<Booking> findAllUpcoming(OffsetDateTime from) {
+        return findUpcoming("", from, null);
+    }
+
+    @Override
     public List<Booking> findUpcomingByClassroom(UUID classroomId, OffsetDateTime from) {
-        return findUpcoming(SELECT + "WHERE classroom_id = ?" + UPCOMING, classroomId, from);
+        return findUpcoming(" AND classroom_id = ?", from, Objects.requireNonNull(classroomId));
     }
 
     @Override
     public List<Booking> findUpcomingByCustomer(UUID customerId, OffsetDateTime from) {
-        return findUpcoming(SELECT + "WHERE customer_id = ?" + UPCOMING, customerId, from);
+        return findUpcoming(" AND customer_id = ?", from, Objects.requireNonNull(customerId));
     }
 
-    private List<Booking> findUpcoming(String sql, UUID id, OffsetDateTime from) {
+    private List<Booking> findUpcoming(String filter, OffsetDateTime from, UUID id) {
         try (var connection = connections.openConnection();
-             var statement = connection.prepareStatement(sql)) {
-            statement.setObject(1, id);
-            statement.setObject(2, from);
+             var statement = connection.prepareStatement(SELECT + filter + START_TIME_ORDER)) {
+            statement.setObject(1, from);
+            if (id != null) {
+                statement.setObject(2, id);
+            }
             try (var rows = statement.executeQuery()) {
                 List<Booking> bookings = new ArrayList<>();
                 while (rows.next()) {

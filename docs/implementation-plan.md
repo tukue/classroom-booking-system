@@ -45,7 +45,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Done when:** both customer types can be registered, saved through JDBC, loaded again, and displayed correctly. This feature is implemented and covered by console and JDBC integration tests.
 
-### 3. Classroom management
+### 3. Classroom management — implemented
 
 **Branch:** `feature/classroom-management`
 
@@ -92,7 +92,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Done when:** a valid booking is persisted and linked to its customer, booking user, and classroom; invalid requirements and conflicting bookings are rejected; comments may be omitted.
 
-### 6. View bookings by room and customer
+### 6. View bookings by room and customer — implemented
 
 **Branch:** `feature/bookings-by-room-customer`
 
@@ -106,7 +106,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Done when:** each view returns only bookings linked to the selected room or customer and displays them in time order.
 
-### 7. View all upcoming bookings
+### 7. View all upcoming bookings — implemented
 
 **Branch:** `feature/upcoming-bookings`
 
