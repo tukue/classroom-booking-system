@@ -1,5 +1,6 @@
 package com.classroombooking.presentation.console;
 
+import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.Equipment;
@@ -30,6 +31,10 @@ public final class ConsoleView {
     }
 
     public int readMenuChoice(boolean classroomsEnabled) {
+        return readMenuChoice(classroomsEnabled, false);
+    }
+
+    int readMenuChoice(boolean classroomsEnabled, boolean bookingSchedulesEnabled) {
         output.println("\nClassroom Booking System");
         output.println("1. Register customer");
         output.println("2. List customers");
@@ -38,6 +43,10 @@ public final class ConsoleView {
             output.println("4. Create classroom");
             output.println("5. Update classroom");
             output.println("6. Delete classroom");
+        }
+        if (bookingSchedulesEnabled) {
+            output.println("7. View upcoming bookings by classroom");
+            output.println("8. View upcoming bookings by customer");
         }
         output.println("0. Exit");
         return readInteger("Choose an option: ");
@@ -56,14 +65,22 @@ public final class ConsoleView {
     }
 
     UUID readClassroomId() {
-        String id = readText("Classroom ID: ");
+        return readId("Classroom", "classroom");
+    }
+
+    UUID readCustomerId() {
+        return readId("Customer", "customer");
+    }
+
+    private UUID readId(String label, String entity) {
+        String id = readText(label + " ID: ");
         if (id == null) {
             return null;
         }
         try {
             return UUID.fromString(id.strip());
         } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Enter a valid classroom ID.", exception);
+            throw new IllegalArgumentException("Enter a valid " + entity + " ID.", exception);
         }
     }
 
@@ -89,6 +106,21 @@ public final class ConsoleView {
             default -> throw new IllegalArgumentException("Enter yes or no for accessibility.");
         };
         return new ClassroomDetails(name, seats, selected, accessible);
+    }
+
+    void showBookings(List<Booking> bookings) {
+        if (bookings.isEmpty()) {
+            showMessage("No upcoming bookings found.");
+            return;
+        }
+        showMessage("Upcoming bookings (UTC)");
+        for (Booking booking : bookings) {
+            output.printf("%s to %s | Classroom: %s | Customer: %s | Booking: %s%n",
+                    booking.startsAt(), booking.endsAt(), booking.classroomId(), booking.customerId(), booking.id());
+            if (booking.comments() != null && !booking.comments().isBlank()) {
+                output.println(booking.comments());
+            }
+        }
     }
 
     void showClassrooms(List<Classroom> classrooms) {

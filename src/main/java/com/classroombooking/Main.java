@@ -4,9 +4,11 @@ import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
 import com.classroombooking.infrastructure.database.DatabaseInitializer;
 import com.classroombooking.infrastructure.database.DatabaseManager;
+import com.classroombooking.infrastructure.persistence.JdbcBookingScheduleRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
+import com.classroombooking.presentation.console.BookingScheduleController;
 import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.CustomerController;
@@ -15,6 +17,7 @@ import com.classroombooking.presentation.console.ConsoleView;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -64,6 +67,7 @@ public final class Main {
         ConsoleMenu menu = new ConsoleMenu(
                 new ClassroomController(classroomService),
                 new CustomerController(customerService),
+                new BookingScheduleController(new JdbcBookingScheduleRepository(databaseManager), Clock.systemUTC()),
                 new ConsoleView(System.in, System.out));
         menu.run();
     }
