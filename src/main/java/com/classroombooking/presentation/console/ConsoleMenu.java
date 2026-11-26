@@ -8,10 +8,13 @@ import java.util.Objects;
 /** Runs the minimal console menu for customer registration and listing. */
 public final class ConsoleMenu {
     private final CustomerController customerController;
+    private final RoomSearchController roomSearchController;
     private final ConsoleView view;
 
-    public ConsoleMenu(CustomerController customerController, ConsoleView view) {
+    public ConsoleMenu(CustomerController customerController,
+                       RoomSearchController roomSearchController, ConsoleView view) {
         this.customerController = Objects.requireNonNull(customerController);
+        this.roomSearchController = Objects.requireNonNull(roomSearchController);
         this.view = Objects.requireNonNull(view);
     }
 
@@ -26,6 +29,7 @@ public final class ConsoleMenu {
                     }
                     case 1 -> registerCustomer();
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
+                    case 3 -> searchAvailableClassrooms();
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
@@ -53,5 +57,24 @@ public final class ConsoleMenu {
                 ? customerController.registerCompany(name, email)
                 : customerController.registerIndividual(name, email);
         view.showMessage("Registered customer " + customer.name() + ".");
+    }
+
+    private void searchAvailableClassrooms() {
+        String startsAt = view.readText("Start time (ISO-8601 with offset): ");
+        String endsAt = view.readText("End time (ISO-8601 with offset): ");
+        int capacity = view.readInteger("Required capacity: ");
+        if (startsAt == null || endsAt == null) {
+            return;
+        }
+
+        view.showEquipmentOptions(roomSearchController.findAllEquipment());
+        String requiredEquipment = view.readText("Required equipment (comma-separated, optional): ");
+        if (requiredEquipment == null) {
+            return;
+        }
+        boolean accessibilityRequired = view.readYesNo("Accessibility required? (yes/no): ");
+
+        view.showAvailableClassrooms(roomSearchController.findAvailableRooms(
+                startsAt, endsAt, capacity, requiredEquipment, accessibilityRequired));
     }
 }
