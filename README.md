@@ -53,7 +53,7 @@ set -a && source .env && set +a
 mvn -Ddb.integration=true verify
 ```
 
-The Maven build enforces a minimum of 90% line coverage. JaCoCo writes its report to `target/site/jacoco/index.html`. The integration tests check repeatable schema initialization, seeded classroom/equipment relationships, email uniqueness, and booking-overlap constraints.
+The Maven build enforces a minimum of 90% line coverage. JaCoCo writes its report to `target/site/jacoco/index.html`. Integration tests exercise the console customer-registration flow against PostgreSQL and check repeatable schema initialization, seeded classroom/equipment relationships, email uniqueness, and booking-overlap constraints.
 
 ## UML class diagram
 

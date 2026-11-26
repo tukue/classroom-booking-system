@@ -8,11 +8,16 @@ import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
+import com.classroombooking.presentation.console.ConsoleMenu;
+import com.classroombooking.presentation.console.CustomerController;
+import com.classroombooking.presentation.console.ConsoleView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -20,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -188,6 +194,45 @@ class DatabaseIntegrationTest {
                 repository.deleteById(individual.id());
             }
             repository.deleteById(company.id());
+        }
+    }
+
+    @Test
+    void consoleCustomerRegistrationPersistsAndDisplaysCompanyAndIndividual() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+
+        CustomerRepository repository = new JdbcCustomerRepository(databaseManager);
+        CustomerController controller = new CustomerController(new CustomerService(repository));
+        String suffix = UUID.randomUUID().toString();
+        String companyEmail = "console-company-" + suffix + "@example.test";
+        String individualEmail = "console-individual-" + suffix + "@example.test";
+        String menuInput = "1\n1\nConsole Company\n" + companyEmail + "\n"
+                + "1\n2\nConsole Individual\n" + individualEmail + "\n2\n0\n";
+        ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+        try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
+            ConsoleView view = new ConsoleView(
+                    new ByteArrayInputStream(menuInput.getBytes(StandardCharsets.UTF_8)), output);
+            new ConsoleMenu(controller, view).run();
+        }
+
+        try {
+            List<Customer> persistedCustomers = new JdbcCustomerRepository(databaseManager).findAll()
+                    .stream()
+                    .filter(customer -> customer.email().equals(companyEmail)
+                            || customer.email().equals(individualEmail))
+                    .toList();
+
+            assertEquals(2, persistedCustomers.size());
+            assertTrue(persistedCustomers.stream().anyMatch(CompanyCustomer.class::isInstance));
+            assertTrue(persistedCustomers.stream().anyMatch(IndividualCustomer.class::isInstance));
+            assertTrue(outputBytes.toString(StandardCharsets.UTF_8).contains(companyEmail));
+            assertTrue(outputBytes.toString(StandardCharsets.UTF_8).contains(individualEmail));
+        } finally {
+            new JdbcCustomerRepository(databaseManager).findAll().stream()
+                    .filter(customer -> customer.email().equals(companyEmail)
+                            || customer.email().equals(individualEmail))
+                    .forEach(customer -> repository.deleteById(customer.id()));
         }
     }
 
