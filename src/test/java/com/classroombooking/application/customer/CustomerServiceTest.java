@@ -21,13 +21,13 @@ class CustomerServiceTest {
         CustomerService service = new CustomerService(new InMemoryCustomerRepository());
 
         Customer company = service.registerCompany(" Acme Ltd ", " sales@acme.test ");
-        Customer individual = service.registerIndividual(" Pat Customer ", " pat@example.test ");
+        Customer individual = service.registerIndividual(" Alex Customer ", " alex.customer@example.test ");
 
         assertInstanceOf(CompanyCustomer.class, company);
         assertEquals("Acme Ltd", company.name());
         assertEquals("sales@acme.test", company.email());
         assertInstanceOf(IndividualCustomer.class, individual);
-        assertEquals("Pat Customer", individual.name());
+        assertEquals("Alex Customer", individual.name());
         assertEquals(2, service.findAllCustomers().size());
     }
 

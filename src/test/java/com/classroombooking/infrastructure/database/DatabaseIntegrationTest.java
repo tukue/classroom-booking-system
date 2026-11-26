@@ -176,7 +176,7 @@ class DatabaseIntegrationTest {
         Customer company = service.registerCompany("Acme Ltd", "acme-" + suffix + "@example.test");
         Customer individual = null;
         try {
-            individual = service.registerIndividual("Pat Customer", "pat-" + suffix + "@example.test");
+            individual = service.registerIndividual("Alex Customer", "alex-" + suffix + "@example.test");
 
             assertInstanceOf(CompanyCustomer.class, repository.findById(company.id()).orElseThrow());
             assertInstanceOf(IndividualCustomer.class, repository.findById(individual.id()).orElseThrow());

@@ -23,16 +23,16 @@ class ConsoleMenuTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         InMemoryCustomerRepository repository = new InMemoryCustomerRepository();
         ConsoleMenu menu = menu("2\n1\n1\nAcme Ltd\nsales@acme.test\n"
-                + "1\n2\nPat Customer\npat@example.test\n2\n0\n", output, repository);
+                + "1\n2\nAlex Customer\nalex.customer@example.test\n2\n0\n", output, repository);
 
         menu.run();
 
         String display = output.toString(StandardCharsets.UTF_8);
         assertTrue(display.contains("No customers registered."));
         assertTrue(display.contains("Registered customer Acme Ltd."));
-        assertTrue(display.contains("Registered customer Pat Customer."));
+        assertTrue(display.contains("Registered customer Alex Customer."));
         assertTrue(display.contains("sales@acme.test"));
-        assertTrue(display.contains("pat@example.test"));
+        assertTrue(display.contains("alex.customer@example.test"));
         assertTrue(display.contains("Goodbye."));
     }
 
@@ -58,7 +58,7 @@ class ConsoleMenuTest {
         assertTrue(output.toString(StandardCharsets.UTF_8).contains("Company name must not be blank."));
 
         ByteArrayOutputStream persistenceOutput = new ByteArrayOutputStream();
-        ConsoleMenu persistenceFailureMenu = menu("1\n2\nPat Customer\npat@example.test\n0\n",
+        ConsoleMenu persistenceFailureMenu = menu("1\n2\nAlex Customer\nalex.customer@example.test\n0\n",
                 persistenceOutput, new InMemoryCustomerRepository(true));
         persistenceFailureMenu.run();
         String persistenceMessage = persistenceOutput.toString(StandardCharsets.UTF_8);
