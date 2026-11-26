@@ -3,12 +3,13 @@ services:
     image: postgres:17-alpine
     container_name: classroom-booking-database
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-classroom_booking}
       POSTGRES_USER: ${POSTGRES_USER:-classroom_app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-classroom_dev}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - classroom-booking-data:/var/lib/postgresql/data
     healthcheck:
