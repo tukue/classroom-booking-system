@@ -43,6 +43,10 @@ flowchart TB
         DB[(PostgreSQL 17 container)]
     end
 
+    subgraph SharedBackend[Optional shared team environment]
+        Supabase[(Supabase managed PostgreSQL)]
+    end
+
     Operator --> View
     View --> CustomerController
     View --> ClassroomController
@@ -75,6 +79,7 @@ flowchart TB
     JdbcClassroom --> DatabaseManager
     JdbcBooking --> DatabaseManager
     DatabaseManager --> DB
+    DatabaseManager -. JDBC_URL override .-> Supabase
 ```
 
 ### MVC responsibilities
@@ -158,6 +163,18 @@ erDiagram
 The application uses PostgreSQL through the PostgreSQL JDBC driver. Docker Compose runs the database and stores its data in the named `classroom-booking-data` volume. Copy `.env.example` to `.env`, set a non-empty `POSTGRES_PASSWORD`, then start/stop the database with `docker compose up -d database` and `docker compose down`. The application has no default database password and fails clearly when `POSTGRES_PASSWORD` is missing.
 
 From the Java application running on the host, the default JDBC URL is `jdbc:postgresql://localhost:5433/classroom_booking`. `DatabaseManager` reads `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` from the process environment; `JDBC_URL` can override the generated URL. In WSL, load local settings with `set -a && source .env && set +a` before running Maven. The database service is health-checked before use.
+
+## Possible shared database for team testing
+
+The current setup uses PostgreSQL in local Docker Compose. If the team later wants a shared development/testing database, it can provision a dedicated Supabase project. Supabase provides managed PostgreSQL; the Java application would continue to use the PostgreSQL JDBC driver and repositories, with no Supabase-specific client or API dependency. Developers could point the existing connection factory at Supabase by setting `JDBC_URL`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in their local, Git-ignored `.env` file. For example, use a JDBC URL in this form, filled with the project's connection details:
+
+```text
+JDBC_URL=jdbc:postgresql://<supabase-host>:5432/postgres?sslmode=require
+POSTGRES_USER=<supabase-database-user>
+POSTGRES_PASSWORD=<supabase-database-password>
+```
+
+Use a dedicated development/testing project rather than a production database: schema initialization creates/updates tables and seed data, and integration tests insert and delete test records. Keep GitHub Actions on its isolated PostgreSQL service so each CI run does not depend on shared team data or network availability. Local Docker Compose remains available for offline development.
 
 To initialize the schema and run the console readiness check from WSL:
 
