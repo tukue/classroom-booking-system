@@ -3,7 +3,7 @@ package com.classroombooking.application.roomsearch;
 import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.RoomRequirements;
-import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.ClassroomRepository;
 
 import java.time.OffsetDateTime;
@@ -17,10 +17,10 @@ import java.util.stream.Collectors;
 /** Finds classrooms that meet room requirements and have no overlapping bookings. */
 public final class RoomSearchService {
     private final ClassroomRepository classroomRepository;
-    private final BookingRepository bookingRepository;
+    private final BookingAvailabilityRepository bookingRepository;
 
     public RoomSearchService(ClassroomRepository classroomRepository,
-                             BookingRepository bookingRepository) {
+                             BookingAvailabilityRepository bookingRepository) {
         this.classroomRepository = Objects.requireNonNull(classroomRepository);
         this.bookingRepository = Objects.requireNonNull(bookingRepository);
     }

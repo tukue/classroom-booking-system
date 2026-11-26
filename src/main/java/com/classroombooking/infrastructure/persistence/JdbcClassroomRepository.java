@@ -7,96 +7,155 @@ import com.classroombooking.domain.repository.ClassroomRepository;
 import com.classroombooking.infrastructure.database.ConnectionFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-/** Loads classroom attributes and equipment for room searches. */
 public final class JdbcClassroomRepository implements ClassroomRepository {
-    private static final Logger LOGGER = Logger.getLogger(JdbcClassroomRepository.class.getName());
-    private static final String SELECT_CLASSROOMS = "SELECT c.classroom_id, c.name, "
-            + "c.seating_capacity, c.accessible, e.equipment_id, e.name AS equipment_name "
-            + "FROM classrooms c LEFT JOIN classroom_equipment ce "
-            + "ON ce.classroom_id = c.classroom_id LEFT JOIN equipment e "
-            + "ON e.equipment_id = ce.equipment_id";
+    private static final String SELECT = """
+            SELECT c.classroom_id, c.name, c.seating_capacity, c.accessible,
+                   e.equipment_id, e.name AS equipment_name
+            FROM classrooms c
+            LEFT JOIN classroom_equipment ce ON ce.classroom_id = c.classroom_id
+            LEFT JOIN equipment e ON e.equipment_id = ce.equipment_id
+            """;
 
-    private final ConnectionFactory connectionFactory;
+    private final ConnectionFactory connections;
 
-    public JdbcClassroomRepository(ConnectionFactory connectionFactory) {
-        this.connectionFactory = Objects.requireNonNull(connectionFactory);
+    public JdbcClassroomRepository(ConnectionFactory connections) {
+        this.connections = Objects.requireNonNull(connections);
+    }
+
+    @Override
+    public Classroom save(Classroom classroom) {
+        write(classroom, """
+                INSERT INTO classrooms (name, seating_capacity, accessible, classroom_id)
+                VALUES (?, ?, ?, ?)
+                """, false);
+        return classroom;
+    }
+
+    @Override
+    public void update(Classroom classroom) {
+        write(classroom, """
+                UPDATE classrooms SET name = ?, seating_capacity = ?, accessible = ?
+                WHERE classroom_id = ?
+                """, true);
+    }
+
+    private void write(Classroom classroom, String sql, boolean replaceEquipment) {
+        try (Connection connection = connections.openConnection()) {
+            connection.setAutoCommit(false);
+            try (var statement = connection.prepareStatement(sql)) {
+                statement.setString(1, classroom.name());
+                statement.setInt(2, classroom.seatingCapacity());
+                statement.setBoolean(3, classroom.accessible());
+                statement.setObject(4, classroom.id());
+                requireClassroom(statement.executeUpdate());
+                if (replaceEquipment) {
+                    try (var remove = connection.prepareStatement(
+                            "DELETE FROM classroom_equipment WHERE classroom_id = ?")) {
+                        remove.setObject(1, classroom.id());
+                        remove.executeUpdate();
+                    }
+                }
+                insertEquipment(connection, classroom);
+                connection.commit();
+            } catch (SQLException | RuntimeException exception) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    exception.addSuppressed(rollbackFailure);
+                }
+                throw exception;
+            }
+        } catch (SQLException exception) {
+            throw switch (exception.getSQLState() == null ? "" : exception.getSQLState()) {
+                case "23505" -> new IllegalArgumentException(
+                        "A classroom with that name already exists.", exception);
+                case "23503" -> new IllegalArgumentException(
+                        "Selected equipment is no longer available.", exception);
+                default -> new PersistenceException("Unable to save the classroom.", exception);
+            };
+        }
+    }
+
+    private void insertEquipment(Connection connection, Classroom classroom) throws SQLException {
+        try (var statement = connection.prepareStatement(
+                "INSERT INTO classroom_equipment (classroom_id, equipment_id) VALUES (?, ?)")) {
+            for (Equipment item : classroom.equipment()) {
+                statement.setObject(1, classroom.id());
+                statement.setObject(2, item.id());
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        }
     }
 
     @Override
     public Optional<Classroom> findById(UUID classroomId) {
-        List<Classroom> classrooms = queryClassrooms(classroomId);
-        return classrooms.stream().findFirst();
+        Objects.requireNonNull(classroomId);
+        return read("WHERE c.classroom_id = ?", classroomId).stream().findFirst();
     }
 
     @Override
     public List<Classroom> findAll() {
-        return queryClassrooms(null);
+        return read("", null);
     }
 
-    private List<Classroom> queryClassrooms(UUID classroomId) {
-        String sql = SELECT_CLASSROOMS
-                + (classroomId == null ? "" : " WHERE c.classroom_id = ?")
-                + " ORDER BY c.name, e.name";
-        Map<UUID, ClassroomBuilder> classrooms = new LinkedHashMap<>();
-        try (Connection connection = connectionFactory.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            if (classroomId != null) {
-                statement.setObject(1, classroomId);
+    private List<Classroom> read(String filter, UUID id) {
+        try (var connection = connections.openConnection();
+             var statement = connection.prepareStatement(SELECT + filter + " ORDER BY c.name")) {
+            if (id != null) {
+                statement.setObject(1, id);
             }
-            try (ResultSet resultSet = statement.executeQuery()) {
-                while (resultSet.next()) {
-                    UUID id = resultSet.getObject("classroom_id", UUID.class);
-                    ClassroomBuilder classroom = classrooms.get(id);
-                    if (classroom == null) {
-                        classroom = new ClassroomBuilder(id, resultSet.getString("name"),
-                                resultSet.getInt("seating_capacity"),
-                                resultSet.getBoolean("accessible"));
-                        classrooms.put(id, classroom);
-                    }
-                    UUID equipmentId = resultSet.getObject("equipment_id", UUID.class);
-                    if (equipmentId != null) {
-                        classroom.equipment.add(new Equipment(equipmentId,
-                                resultSet.getString("equipment_name")));
-                    }
+            try (var rows = statement.executeQuery()) {
+                List<Classroom> classrooms = new ArrayList<>();
+                boolean hasRow = rows.next();
+                while (hasRow) {
+                    UUID roomId = rows.getObject("classroom_id", UUID.class);
+                    String name = rows.getString("name");
+                    int capacity = rows.getInt("seating_capacity");
+                    boolean accessible = rows.getBoolean("accessible");
+                    Set<Equipment> equipment = new HashSet<>();
+                    do {
+                        UUID equipmentId = rows.getObject("equipment_id", UUID.class);
+                        if (equipmentId != null) {
+                            equipment.add(new Equipment(equipmentId, rows.getString("equipment_name")));
+                        }
+                        hasRow = rows.next();
+                    } while (hasRow && roomId.equals(rows.getObject("classroom_id", UUID.class)));
+                    classrooms.add(new Classroom(roomId, name, capacity, equipment, accessible));
                 }
+                return List.copyOf(classrooms);
             }
-            return classrooms.values().stream().map(ClassroomBuilder::build).toList();
         } catch (SQLException exception) {
-            LOGGER.log(Level.FINE, "Could not load classroom search data.", exception);
-            throw new PersistenceException("Classrooms could not be retrieved. Please try again.", exception);
+            throw new PersistenceException("Unable to load classrooms.", exception);
         }
     }
 
-    private static final class ClassroomBuilder {
-        private final UUID id;
-        private final String name;
-        private final int capacity;
-        private final boolean accessible;
-        private final Set<Equipment> equipment = new LinkedHashSet<>();
-
-        private ClassroomBuilder(UUID id, String name, int capacity, boolean accessible) {
-            this.id = id;
-            this.name = name;
-            this.capacity = capacity;
-            this.accessible = accessible;
+    @Override
+    public void deleteById(UUID classroomId) {
+        try (var connection = connections.openConnection();
+             var statement = connection.prepareStatement("DELETE FROM classrooms WHERE classroom_id = ?")) {
+            statement.setObject(1, classroomId);
+            requireClassroom(statement.executeUpdate());
+        } catch (SQLException exception) {
+            if ("23503".equals(exception.getSQLState())) {
+                throw new IllegalArgumentException("A classroom with bookings cannot be deleted.", exception);
+            }
+            throw new PersistenceException("Unable to delete the classroom.", exception);
         }
+    }
 
-        private Classroom build() {
-            return new Classroom(id, name, capacity, equipment, accessible);
+    private void requireClassroom(int affectedRows) {
+        if (affectedRows == 0) {
+            throw new IllegalArgumentException("Classroom not found.");
         }
     }
 }

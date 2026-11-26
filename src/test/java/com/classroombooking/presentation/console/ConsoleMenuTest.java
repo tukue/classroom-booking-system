@@ -7,7 +7,7 @@ import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.Equipment;
-import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.ClassroomRepository;
 import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.domain.repository.EquipmentRepository;
@@ -111,7 +111,7 @@ class ConsoleMenuTest {
                 new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)),
                 new PrintStream(output, true, StandardCharsets.UTF_8));
         ClassroomRepository classroomRepository = new InMemoryClassroomRepository(classrooms);
-        BookingRepository bookingRepository = (startsAt, endsAt) -> bookings.stream()
+        BookingAvailabilityRepository bookingRepository = (startsAt, endsAt) -> bookings.stream()
                 .filter(booking -> booking.overlaps(startsAt, endsAt))
                 .toList();
         EquipmentRepository equipmentRepository = () -> equipment;
@@ -169,6 +169,11 @@ class ConsoleMenuTest {
     private record InMemoryClassroomRepository(List<Classroom> classrooms)
             implements ClassroomRepository {
         @Override
+        public Classroom save(Classroom classroom) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Classroom> findById(UUID classroomId) {
             return classrooms.stream().filter(room -> room.id().equals(classroomId)).findFirst();
         }
@@ -176,6 +181,16 @@ class ConsoleMenuTest {
         @Override
         public List<Classroom> findAll() {
             return classrooms;
+        }
+
+        @Override
+        public void update(Classroom classroom) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteById(UUID classroomId) {
+            throw new UnsupportedOperationException();
         }
     }
 }

@@ -9,7 +9,7 @@ import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
-import com.classroombooking.infrastructure.persistence.JdbcBookingRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ConsoleMenu;
@@ -211,7 +211,7 @@ class DatabaseIntegrationTest {
         CustomerController controller = new CustomerController(new CustomerService(repository));
         RoomSearchService roomSearchService = new RoomSearchService(
                 new JdbcClassroomRepository(databaseManager),
-                new JdbcBookingRepository(databaseManager));
+                new JdbcBookingAvailabilityRepository(databaseManager));
         RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
                 new JdbcEquipmentRepository(databaseManager));
         String suffix = UUID.randomUUID().toString();
@@ -267,7 +267,7 @@ class DatabaseIntegrationTest {
         try {
             RoomSearchService roomSearchService = new RoomSearchService(
                     new JdbcClassroomRepository(databaseManager),
-                    new JdbcBookingRepository(databaseManager));
+                    new JdbcBookingAvailabilityRepository(databaseManager));
             RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
                     new JdbcEquipmentRepository(databaseManager));
             CustomerController customerController = new CustomerController(

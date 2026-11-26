@@ -5,42 +5,31 @@ import com.classroombooking.domain.model.Equipment;
 import com.classroombooking.domain.repository.EquipmentRepository;
 import com.classroombooking.infrastructure.database.ConnectionFactory;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-/** Reads equipment options used by classroom search. */
 public final class JdbcEquipmentRepository implements EquipmentRepository {
-    private static final Logger LOGGER = Logger.getLogger(JdbcEquipmentRepository.class.getName());
-    private final ConnectionFactory connectionFactory;
+    private final ConnectionFactory connections;
 
-    public JdbcEquipmentRepository(ConnectionFactory connectionFactory) {
-        this.connectionFactory = Objects.requireNonNull(connectionFactory);
+    public JdbcEquipmentRepository(ConnectionFactory connections) {
+        this.connections = Objects.requireNonNull(connections);
     }
 
     @Override
     public List<Equipment> findAll() {
-        List<Equipment> equipment = new ArrayList<>();
-        String sql = "SELECT equipment_id, name FROM equipment ORDER BY name";
-        try (Connection connection = connectionFactory.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-            while (resultSet.next()) {
-                equipment.add(new Equipment(resultSet.getObject("equipment_id", UUID.class),
-                        resultSet.getString("name")));
+        try (var connection = connections.openConnection();
+             var statement = connection.prepareStatement("SELECT equipment_id, name FROM equipment ORDER BY name");
+             var rows = statement.executeQuery()) {
+            List<Equipment> catalog = new ArrayList<>();
+            while (rows.next()) {
+                catalog.add(new Equipment(rows.getObject("equipment_id", UUID.class), rows.getString("name")));
             }
-            return List.copyOf(equipment);
+            return List.copyOf(catalog);
         } catch (SQLException exception) {
-            LOGGER.log(Level.FINE, "Could not load equipment search options.", exception);
-            throw new PersistenceException("Equipment options could not be retrieved. Please try again.",
-                    exception);
+            throw new PersistenceException("Unable to load the equipment catalog.", exception);
         }
     }
 }

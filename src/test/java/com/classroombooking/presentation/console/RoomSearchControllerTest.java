@@ -4,7 +4,7 @@ import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Equipment;
-import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.ClassroomRepository;
 import com.classroombooking.domain.repository.EquipmentRepository;
 import org.junit.jupiter.api.Test;
@@ -50,6 +50,11 @@ class RoomSearchControllerTest {
     private RoomSearchController controller(Classroom classroom, Equipment equipment) {
         ClassroomRepository classroomRepository = new ClassroomRepository() {
             @Override
+            public Classroom save(Classroom room) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
             public Optional<Classroom> findById(UUID id) {
                 return classroom.id().equals(id) ? Optional.of(classroom) : Optional.empty();
             }
@@ -58,8 +63,18 @@ class RoomSearchControllerTest {
             public List<Classroom> findAll() {
                 return List.of(classroom);
             }
+
+            @Override
+            public void update(Classroom room) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void deleteById(UUID id) {
+                throw new UnsupportedOperationException();
+            }
         };
-        BookingRepository bookingRepository = (startsAt, endsAt) -> List.<Booking>of();
+        BookingAvailabilityRepository bookingRepository = (startsAt, endsAt) -> List.<Booking>of();
         EquipmentRepository equipmentRepository = () -> List.of(equipment);
         return new RoomSearchController(new RoomSearchService(classroomRepository, bookingRepository),
                 equipmentRepository);

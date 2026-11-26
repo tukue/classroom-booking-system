@@ -1,13 +1,15 @@
 package com.classroombooking;
 
+import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.infrastructure.database.DatabaseInitializer;
 import com.classroombooking.infrastructure.database.DatabaseManager;
-import com.classroombooking.infrastructure.persistence.JdbcBookingRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
+import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.CustomerController;
 import com.classroombooking.presentation.console.RoomSearchController;
@@ -60,12 +62,16 @@ public final class Main {
         DatabaseManager databaseManager = DatabaseManager.getInstance();
         CustomerService customerService = new CustomerService(
                 new JdbcCustomerRepository(databaseManager));
+        ClassroomService classroomService = new ClassroomService(
+                new JdbcClassroomRepository(databaseManager),
+                new JdbcEquipmentRepository(databaseManager));
         RoomSearchService roomSearchService = new RoomSearchService(
                 new JdbcClassroomRepository(databaseManager),
-                new JdbcBookingRepository(databaseManager));
+                new JdbcBookingAvailabilityRepository(databaseManager));
         RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
                 new JdbcEquipmentRepository(databaseManager));
-        ConsoleMenu menu = new ConsoleMenu(new CustomerController(customerService),
+        ConsoleMenu menu = new ConsoleMenu(new ClassroomController(classroomService),
+                new CustomerController(customerService),
                 roomSearchController, new ConsoleView(System.in, System.out));
         menu.run();
     }

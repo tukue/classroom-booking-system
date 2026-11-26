@@ -4,11 +4,12 @@ import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Equipment;
 import com.classroombooking.domain.model.RoomRequirements;
-import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.ClassroomRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -62,8 +63,19 @@ class RoomSearchServiceTest {
         return OffsetDateTime.parse("2035-04-01T" + time);
     }
 
-    private record InMemoryClassroomRepository(List<Classroom> classrooms)
-            implements ClassroomRepository {
+    private static final class InMemoryClassroomRepository implements ClassroomRepository {
+        private final List<Classroom> classrooms;
+
+        private InMemoryClassroomRepository(List<Classroom> classrooms) {
+            this.classrooms = new ArrayList<>(classrooms);
+        }
+
+        @Override
+        public Classroom save(Classroom classroom) {
+            classrooms.add(classroom);
+            return classroom;
+        }
+
         @Override
         public Optional<Classroom> findById(UUID classroomId) {
             return classrooms.stream().filter(room -> room.id().equals(classroomId)).findFirst();
@@ -71,12 +83,23 @@ class RoomSearchServiceTest {
 
         @Override
         public List<Classroom> findAll() {
-            return classrooms;
+            return List.copyOf(classrooms);
+        }
+
+        @Override
+        public void update(Classroom classroom) {
+            deleteById(classroom.id());
+            classrooms.add(classroom);
+        }
+
+        @Override
+        public void deleteById(UUID classroomId) {
+            classrooms.removeIf(classroom -> classroom.id().equals(classroomId));
         }
     }
 
     private record InMemoryBookingRepository(List<Booking> overlapping)
-            implements BookingRepository {
+            implements BookingAvailabilityRepository {
         @Override
         public List<Booking> findOverlapping(OffsetDateTime startsAt, OffsetDateTime endsAt) {
             return overlapping.stream()

@@ -2,7 +2,7 @@ package com.classroombooking.infrastructure.persistence;
 
 import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.Booking;
-import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.infrastructure.database.ConnectionFactory;
 
 import java.sql.Connection;
@@ -18,11 +18,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Reads existing room bookings to exclude occupied classrooms from search results. */
-public final class JdbcBookingRepository implements BookingRepository {
-    private static final Logger LOGGER = Logger.getLogger(JdbcBookingRepository.class.getName());
+public final class JdbcBookingAvailabilityRepository implements BookingAvailabilityRepository {
+    private static final Logger LOGGER = Logger.getLogger(JdbcBookingAvailabilityRepository.class.getName());
     private final ConnectionFactory connectionFactory;
 
-    public JdbcBookingRepository(ConnectionFactory connectionFactory) {
+    public JdbcBookingAvailabilityRepository(ConnectionFactory connectionFactory) {
         this.connectionFactory = Objects.requireNonNull(connectionFactory);
     }
 
