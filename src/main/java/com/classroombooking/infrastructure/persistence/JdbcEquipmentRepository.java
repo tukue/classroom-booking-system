@@ -8,13 +8,14 @@ import com.classroombooking.infrastructure.database.ConnectionFactory;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class JdbcEquipmentRepository implements EquipmentRepository {
     private final ConnectionFactory connections;
 
     public JdbcEquipmentRepository(ConnectionFactory connections) {
-        this.connections = connections;
+        this.connections = Objects.requireNonNull(connections);
     }
 
     @Override

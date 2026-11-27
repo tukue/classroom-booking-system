@@ -1,15 +1,24 @@
 package com.classroombooking.presentation.console;
 
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.classroom.ClassroomService;
+import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
+import com.classroombooking.domain.model.Booking;
+import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
+import com.classroombooking.domain.model.Equipment;
+import com.classroombooking.domain.repository.BookingAvailabilityRepository;
+import com.classroombooking.domain.repository.ClassroomRepository;
 import com.classroombooking.domain.repository.CustomerRepository;
+import com.classroombooking.domain.repository.EquipmentRepository;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -66,12 +75,85 @@ class ConsoleMenuTest {
         assertTrue(!persistenceMessage.contains("secret_schema"));
     }
 
+    @Test
+    void searchesRoomsByRequirementsAndHidesRoomsWithOverlappingBookings() {
+        Equipment projector = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Classroom available = new Classroom(UUID.randomUUID(), "Available Room", 20,
+                java.util.Set.of(projector), true);
+        Classroom booked = new Classroom(UUID.randomUUID(), "Booked Room", 24,
+                java.util.Set.of(projector), true);
+        Booking existingBooking = new Booking(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                booked.id(), OffsetDateTime.parse("2026-12-02T09:00:00Z"),
+                OffsetDateTime.parse("2026-12-02T10:00:00Z"), null);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ConsoleMenu menu = menu("7\n2026-12-02T09:30:00Z\n2026-12-02T10:30:00Z\n"
+                        + "12\nPROJECTOR\ny\n0\n", output,
+                new InMemoryCustomerRepository(), List.of(available, booked),
+                List.of(existingBooking), List.of(projector));
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("Available Room | capacity: 20 | accessible: yes"));
+        assertTrue(!display.contains("Booked Room"));
+    }
+
+    @Test
+    void reportsAmbiguousEquipmentAndKeepsTheMenuRunning() {
+        Equipment projectorUppercase = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Equipment projectorLowercase = new Equipment(UUID.randomUUID(), "projector");
+        Classroom room = new Classroom(UUID.randomUUID(), "Projector Room", 20,
+                java.util.Set.of(projectorUppercase), true);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ConsoleMenu menu = menu("7\n2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n"
+                        + "10\nPROJECTOR\ny\n0\n", output, new InMemoryCustomerRepository(),
+                List.of(room), List.of(), List.of(projectorUppercase, projectorLowercase));
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("Equipment name is ambiguous: PROJECTOR"));
+        assertTrue(display.contains("Goodbye."));
+    }
+
+    @Test
+    void stopsSearchWhenTimeInputEndsBeforeCapacity() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ConsoleMenu menu = menu("7\n2026-12-02T09:00:00Z\n", output,
+                new InMemoryCustomerRepository());
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(!display.contains("Required capacity:"));
+        assertTrue(display.contains("Goodbye."));
+    }
+
     private ConsoleMenu menu(String input, ByteArrayOutputStream output,
                               InMemoryCustomerRepository repository) {
+        return menu(input, output, repository, List.of(), List.of(),
+                List.of(new Equipment(UUID.randomUUID(), "PROJECTOR")));
+    }
+
+    private ConsoleMenu menu(String input, ByteArrayOutputStream output,
+                             InMemoryCustomerRepository customerRepository,
+                             List<Classroom> classrooms, List<Booking> bookings,
+                             List<Equipment> equipment) {
         ConsoleView view = new ConsoleView(
                 new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)),
                 new PrintStream(output, true, StandardCharsets.UTF_8));
-        return new ConsoleMenu(new CustomerController(new CustomerService(repository)), view);
+        ClassroomRepository classroomRepository = new InMemoryClassroomRepository(classrooms);
+        BookingAvailabilityRepository bookingRepository = (startsAt, endsAt) -> bookings.stream()
+                .filter(booking -> booking.overlaps(startsAt, endsAt))
+                .toList();
+        EquipmentRepository equipmentRepository = () -> equipment;
+        RoomSearchService roomSearchService = new RoomSearchService(classroomRepository, bookingRepository);
+        RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
+                equipmentRepository);
+        ClassroomController classroomController = new ClassroomController(
+                new ClassroomService(classroomRepository, equipmentRepository));
+        return new ConsoleMenu(classroomController,
+                new CustomerController(new CustomerService(customerRepository)), roomSearchController, view);
     }
 
     private static final class InMemoryCustomerRepository implements CustomerRepository {
@@ -115,6 +197,34 @@ class ConsoleMenuTest {
         @Override
         public void deleteById(UUID customerId) {
             customers.removeIf(customer -> customer.id().equals(customerId));
+        }
+    }
+
+    private record InMemoryClassroomRepository(List<Classroom> classrooms)
+            implements ClassroomRepository {
+        @Override
+        public Classroom save(Classroom classroom) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Classroom> findById(UUID classroomId) {
+            return classrooms.stream().filter(room -> room.id().equals(classroomId)).findFirst();
+        }
+
+        @Override
+        public List<Classroom> findAll() {
+            return classrooms;
+        }
+
+        @Override
+        public void update(Classroom classroom) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteById(UUID classroomId) {
+            throw new UnsupportedOperationException();
         }
     }
 }

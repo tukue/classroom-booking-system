@@ -2,15 +2,18 @@ package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Equipment;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.ConsoleView;
 import com.classroombooking.presentation.console.CustomerController;
+import com.classroombooking.presentation.console.RoomSearchController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -145,7 +148,9 @@ class ClassroomManagementIntegrationTest {
         var view = new ConsoleView(input, new PrintStream(output, true, StandardCharsets.UTF_8));
         var classrooms = new ClassroomController(new ClassroomService(rooms, new JdbcEquipmentRepository(database)));
         var customers = new CustomerController(new CustomerService(new JdbcCustomerRepository(database)));
-        new ConsoleMenu(classrooms, customers, view).run();
+        var searchService = new RoomSearchService(rooms, new JdbcBookingAvailabilityRepository(database));
+        var search = new RoomSearchController(searchService, new JdbcEquipmentRepository(database));
+        new ConsoleMenu(classrooms, customers, search, view).run();
         return output.toString(StandardCharsets.UTF_8);
     }
 }
