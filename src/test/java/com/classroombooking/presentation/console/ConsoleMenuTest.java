@@ -30,8 +30,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConsoleMenuTest {
     @Test
@@ -56,7 +57,7 @@ class ConsoleMenuTest {
         assertTrue(display.contains("Training Room | capacity: 20 | accessible: yes"));
         assertTrue(display.contains("Booking created:"));
         assertTrue(display.contains("Goodbye."));
-        assertTrue(!display.contains("Error:"));
+        assertFalse(display.contains("Error:"));
         assertEquals(2, customers.findAll().size());
     }
 
@@ -121,7 +122,7 @@ class ConsoleMenuTest {
         persistenceFailureMenu.run();
         String persistenceMessage = persistenceOutput.toString(StandardCharsets.UTF_8);
         assertTrue(persistenceMessage.contains("Customer could not be saved. Please try again."));
-        assertTrue(!persistenceMessage.contains("secret_schema"));
+        assertFalse(persistenceMessage.contains("secret_schema"));
     }
 
     @Test
@@ -144,7 +145,7 @@ class ConsoleMenuTest {
 
         String display = output.toString(StandardCharsets.UTF_8);
         assertTrue(display.contains("Available Room | capacity: 20 | accessible: yes"));
-        assertTrue(!display.contains("Booked Room"));
+        assertFalse(display.contains("Booked Room"));
     }
 
     @Test
@@ -174,7 +175,7 @@ class ConsoleMenuTest {
         menu.run();
 
         String display = output.toString(StandardCharsets.UTF_8);
-        assertTrue(!display.contains("Required capacity:"));
+        assertFalse(display.contains("Required capacity:"));
         assertTrue(display.contains("Goodbye."));
     }
 

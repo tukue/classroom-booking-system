@@ -52,7 +52,7 @@ Run the console customer-booking flow tests without starting PostgreSQL:
 mvn -Dtest=ConsoleMenuTest test
 ```
 
-The automated console test scripts customer registration, qualifying-room selection, and booking creation, and checks the menu output and saved customer. The broader test suite can be run with:
+The automated console test exercises customer registration, qualifying-room selection, and booking creation, then checks the menu output and saved customer. The broader test suite can be run with:
 
 ```bash
 mvn test
