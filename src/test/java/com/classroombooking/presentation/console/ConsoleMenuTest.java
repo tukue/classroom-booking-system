@@ -45,7 +45,7 @@ class ConsoleMenuTest {
                 "Booking Customer", "booking.customer@example.test"));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         String input = "1\n2\nAlex Customer\nalex.customer@example.test\n"
-                + "11\n" + bookingCustomer.id() + "\nJordan Booker\njordan@example.test\n"
+                + "11\n" + bookingCustomer.id() + "\nTest User\ntest.user@example.test\n"
                 + "2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n12\nPROJECTOR\ny\n"
                 + classroom.id() + "\nTeam workshop\n0\n";
         ConsoleMenu menu = menu(input, output, customers, List.of(classroom), List.of(), List.of(projector));
