@@ -11,6 +11,7 @@ import com.classroombooking.domain.model.BookingUser;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.Equipment;
+import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.BookingRepository;
 import com.classroombooking.domain.repository.BookingUserRepository;
@@ -29,9 +30,37 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConsoleMenuTest {
+    @Test
+    void completesCustomerBookingFlowThroughConsoleMenu() {
+        Equipment projector = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Classroom classroom = new Classroom(UUID.randomUUID(), "Training Room", 20,
+                java.util.Set.of(projector), true);
+        InMemoryCustomerRepository customers = new InMemoryCustomerRepository();
+        Customer bookingCustomer = customers.save(new IndividualCustomer(UUID.randomUUID(),
+                "Booking Customer", "booking.customer@example.test"));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        String input = "1\n2\nAlex Customer\nalex.customer@example.test\n"
+                + "11\n" + bookingCustomer.id() + "\nTest User\ntest.user@example.test\n"
+                + "2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n12\nPROJECTOR\ny\n"
+                + classroom.id() + "\nTeam workshop\n0\n";
+        ConsoleMenu menu = menu(input, output, customers, List.of(classroom), List.of(), List.of(projector));
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("Registered customer Alex Customer."));
+        assertTrue(display.contains("Training Room | capacity: 20 | accessible: yes"));
+        assertTrue(display.contains("Booking created:"));
+        assertTrue(display.contains("Goodbye."));
+        assertFalse(display.contains("Error:"));
+        assertEquals(2, customers.findAll().size());
+    }
+
     @Test
     void displaysEmptyAndCommentedBookingSchedules() {
         ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
@@ -93,7 +122,7 @@ class ConsoleMenuTest {
         persistenceFailureMenu.run();
         String persistenceMessage = persistenceOutput.toString(StandardCharsets.UTF_8);
         assertTrue(persistenceMessage.contains("Customer could not be saved. Please try again."));
-        assertTrue(!persistenceMessage.contains("secret_schema"));
+        assertFalse(persistenceMessage.contains("secret_schema"));
     }
 
     @Test
@@ -116,7 +145,7 @@ class ConsoleMenuTest {
 
         String display = output.toString(StandardCharsets.UTF_8);
         assertTrue(display.contains("Available Room | capacity: 20 | accessible: yes"));
-        assertTrue(!display.contains("Booked Room"));
+        assertFalse(display.contains("Booked Room"));
     }
 
     @Test
@@ -146,7 +175,7 @@ class ConsoleMenuTest {
         menu.run();
 
         String display = output.toString(StandardCharsets.UTF_8);
-        assertTrue(!display.contains("Required capacity:"));
+        assertFalse(display.contains("Required capacity:"));
         assertTrue(display.contains("Goodbye."));
     }
 

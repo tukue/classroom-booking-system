@@ -46,6 +46,18 @@ docker compose down
 
 ## Tests and coverage
 
+Run the console customer-booking flow tests without starting PostgreSQL:
+
+```bash
+mvn -Dtest=ConsoleMenuTest test
+```
+
+The automated console test exercises customer registration, qualifying-room selection, and booking creation, then checks the menu output and saved customer. The broader test suite can be run with:
+
+```bash
+mvn test
+```
+
 With PostgreSQL running and `.env` loaded in the shell, run unit and integration tests:
 
 ```bash
