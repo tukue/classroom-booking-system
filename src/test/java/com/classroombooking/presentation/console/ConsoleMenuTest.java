@@ -1,6 +1,7 @@
 package com.classroombooking.presentation.console;
 
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.Booking;
@@ -82,10 +83,10 @@ class ConsoleMenuTest {
         Classroom booked = new Classroom(UUID.randomUUID(), "Booked Room", 24,
                 java.util.Set.of(projector), true);
         Booking existingBooking = new Booking(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                booked.id(), OffsetDateTime.parse("2035-04-01T09:00:00Z"),
-                OffsetDateTime.parse("2035-04-01T10:00:00Z"), null);
+                booked.id(), OffsetDateTime.parse("2026-12-02T09:00:00Z"),
+                OffsetDateTime.parse("2026-12-02T10:00:00Z"), null);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ConsoleMenu menu = menu("3\n2035-04-01T09:30:00Z\n2035-04-01T10:30:00Z\n"
+        ConsoleMenu menu = menu("7\n2026-12-02T09:30:00Z\n2026-12-02T10:30:00Z\n"
                         + "12\nPROJECTOR\ny\n0\n", output,
                 new InMemoryCustomerRepository(), List.of(available, booked),
                 List.of(existingBooking), List.of(projector));
@@ -100,7 +101,7 @@ class ConsoleMenuTest {
     @Test
     void stopsSearchWhenTimeInputEndsBeforeCapacity() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ConsoleMenu menu = menu("3\n2035-04-01T09:00:00Z\n", output,
+        ConsoleMenu menu = menu("7\n2026-12-02T09:00:00Z\n", output,
                 new InMemoryCustomerRepository());
 
         menu.run();
@@ -131,8 +132,10 @@ class ConsoleMenuTest {
         RoomSearchService roomSearchService = new RoomSearchService(classroomRepository, bookingRepository);
         RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
                 equipmentRepository);
-        return new ConsoleMenu(new CustomerController(new CustomerService(customerRepository)),
-                roomSearchController, view);
+        ClassroomController classroomController = new ClassroomController(
+                new ClassroomService(classroomRepository, equipmentRepository));
+        return new ConsoleMenu(classroomController,
+                new CustomerController(new CustomerService(customerRepository)), roomSearchController, view);
     }
 
     private static final class InMemoryCustomerRepository implements CustomerRepository {

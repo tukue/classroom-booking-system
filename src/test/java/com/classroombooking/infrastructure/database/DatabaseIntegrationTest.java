@@ -1,6 +1,7 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
+import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
@@ -13,6 +14,7 @@ import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRe
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ConsoleMenu;
+import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.CustomerController;
 import com.classroombooking.presentation.console.RoomSearchController;
 import com.classroombooking.presentation.console.ConsoleView;
@@ -94,14 +96,14 @@ class DatabaseIntegrationTest {
                 insertBookingUser(connection, bookingUserId);
                 UUID classroomId = findFirstClassroomId(connection);
                 insertBooking(connection, firstBookingId, customerId, bookingUserId, classroomId,
-                        OffsetDateTime.parse("2030-06-01T09:00:00Z"),
-                        OffsetDateTime.parse("2030-06-01T10:00:00Z"));
+                        OffsetDateTime.parse("2026-12-01T09:00:00Z"),
+                        OffsetDateTime.parse("2026-12-01T10:00:00Z"));
 
                 SQLException conflict = assertThrows(SQLException.class,
                         () -> insertBooking(connection, secondBookingId, customerId, bookingUserId,
                                 classroomId,
-                                OffsetDateTime.parse("2030-06-01T09:30:00Z"),
-                                OffsetDateTime.parse("2030-06-01T10:30:00Z")));
+                                OffsetDateTime.parse("2026-12-01T09:30:00Z"),
+                                OffsetDateTime.parse("2026-12-01T10:30:00Z")));
                 assertEquals("23P01", conflict.getSQLState());
             } finally {
                 connection.rollback();
@@ -223,7 +225,8 @@ class DatabaseIntegrationTest {
         try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
             ConsoleView view = new ConsoleView(
                     new ByteArrayInputStream(menuInput.getBytes(StandardCharsets.UTF_8)), output);
-            new ConsoleMenu(controller, roomSearchController, view).run();
+            new ConsoleMenu(createClassroomController(databaseManager), controller,
+                    roomSearchController, view).run();
         }
 
         try {
@@ -260,8 +263,8 @@ class DatabaseIntegrationTest {
             insertBookingUser(connection, bookingUserId);
             classroomId = findClassroomId(connection, "Training Room 05");
             insertBooking(connection, bookingId, customerId, bookingUserId, classroomId,
-                    OffsetDateTime.parse("2035-04-01T09:00:00Z"),
-                    OffsetDateTime.parse("2035-04-01T10:00:00Z"));
+                    OffsetDateTime.parse("2026-12-02T09:00:00Z"),
+                    OffsetDateTime.parse("2026-12-02T10:00:00Z"));
         }
 
         try {
@@ -272,13 +275,14 @@ class DatabaseIntegrationTest {
                     new JdbcEquipmentRepository(databaseManager));
             CustomerController customerController = new CustomerController(
                     new CustomerService(new JdbcCustomerRepository(databaseManager)));
-            String input = "3\n2035-04-01T09:30:00Z\n2035-04-01T10:30:00Z\n"
+            String input = "7\n2026-12-02T09:30:00Z\n2026-12-02T10:30:00Z\n"
                     + "20\nPROJECTOR\ny\n0\n";
             ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
             try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
                 ConsoleView view = new ConsoleView(
                         new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)), output);
-                new ConsoleMenu(customerController, roomSearchController, view).run();
+                new ConsoleMenu(createClassroomController(databaseManager), customerController,
+                        roomSearchController, view).run();
             }
 
             String result = outputBytes.toString(StandardCharsets.UTF_8);
@@ -337,6 +341,12 @@ class DatabaseIntegrationTest {
             resultSet.next();
             return resultSet.getObject(1, UUID.class);
         }
+    }
+
+    private ClassroomController createClassroomController(DatabaseManager databaseManager) {
+        return new ClassroomController(new ClassroomService(
+                new JdbcClassroomRepository(databaseManager),
+                new JdbcEquipmentRepository(databaseManager)));
     }
 
     private UUID findClassroomId(Connection connection, String classroomName) throws SQLException {

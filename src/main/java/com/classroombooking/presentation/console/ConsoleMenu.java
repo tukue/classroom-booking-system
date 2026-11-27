@@ -14,28 +14,17 @@ public final class ConsoleMenu {
     private final RoomSearchController roomSearchController;
     private final ConsoleView view;
 
-    public ConsoleMenu(CustomerController customerController, RoomSearchController roomSearchController,
-                       ConsoleView view) {
-        this(null, customerController, roomSearchController, view);
-    }
-
-    public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
-                       ConsoleView view) {
-        this(classroomController, customerController, null, view);
-    }
-
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
                        RoomSearchController roomSearchController, ConsoleView view) {
-        this.classroomController = classroomController;
+        this.classroomController = Objects.requireNonNull(classroomController);
         this.customerController = Objects.requireNonNull(customerController);
-        this.roomSearchController = roomSearchController;
+        this.roomSearchController = Objects.requireNonNull(roomSearchController);
         this.view = Objects.requireNonNull(view);
     }
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice(classroomController != null,
-                    roomSearchController != null);
+            int choice = view.readMenuChoice();
             try {
                 switch (choice) {
                     case 0 -> {
@@ -44,46 +33,12 @@ public final class ConsoleMenu {
                     }
                     case 1 -> registerCustomer();
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
-                    case 3 -> {
-                        if (classroomController == null) {
-                            if (roomSearchController == null) {
-                                invalidChoice();
-                            } else {
-                                searchAvailableClassrooms();
-                            }
-                        } else {
-                            view.showClassrooms(classroomController.listClassrooms());
-                        }
-                    }
-                    case 4 -> {
-                        if (classroomController == null) {
-                            invalidChoice();
-                        } else {
-                            saveClassroom(null);
-                        }
-                    }
-                    case 5 -> {
-                        if (classroomController == null) {
-                            invalidChoice();
-                        } else {
-                            updateClassroom();
-                        }
-                    }
-                    case 6 -> {
-                        if (classroomController == null) {
-                            invalidChoice();
-                        } else {
-                            deleteClassroom();
-                        }
-                    }
-                    case 7 -> {
-                        if (roomSearchController == null) {
-                            invalidChoice();
-                        } else {
-                            searchAvailableClassrooms();
-                        }
-                    }
-                    default -> invalidChoice();
+                    case 3 -> view.showClassrooms(classroomController.listClassrooms());
+                    case 4 -> saveClassroom(null);
+                    case 5 -> updateClassroom();
+                    case 6 -> deleteClassroom();
+                    case 7 -> searchAvailableClassrooms();
+                    default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
                 view.showError(exception.getMessage());
@@ -161,7 +116,4 @@ public final class ConsoleMenu {
                 startsAt, endsAt, capacity, requiredEquipment, accessibilityRequired));
     }
 
-    private void invalidChoice() {
-        view.showError("Choose one of the listed menu options.");
-    }
 }

@@ -27,7 +27,7 @@ class RoomSearchControllerTest {
         RoomSearchController controller = controller(classroom, projector);
 
         List<Classroom> result = controller.findAvailableRooms(
-                "2035-04-01T09:00:00Z", "2035-04-01T10:00:00Z", 16,
+                "2026-12-02T09:00:00Z", "2026-12-02T10:00:00Z", 16,
                 " projector ", true);
 
         assertEquals(List.of(classroom), result);
@@ -41,10 +41,10 @@ class RoomSearchControllerTest {
                 projector);
 
         assertThrows(IllegalArgumentException.class, () -> controller.findAvailableRooms(
-                "2035-04-01T09:00:00Z", "2035-04-01T10:00:00Z", 10,
+                "2026-12-02T09:00:00Z", "2026-12-02T10:00:00Z", 10,
                 "LASER_CUTTER", false));
         assertThrows(IllegalArgumentException.class, () -> controller.findAvailableRooms(
-                "not-a-time", "2035-04-01T10:00:00Z", 10, "", false));
+                "not-a-time", "2026-12-02T10:00:00Z", 10, "", false));
     }
 
     private RoomSearchController controller(Classroom classroom, Equipment equipment) {

@@ -60,7 +60,7 @@ class RoomSearchServiceTest {
     }
 
     private OffsetDateTime time(String time) {
-        return OffsetDateTime.parse("2035-04-01T" + time);
+        return OffsetDateTime.parse("2026-12-02T" + time);
     }
 
     private static final class InMemoryClassroomRepository implements ClassroomRepository {
