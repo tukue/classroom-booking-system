@@ -18,6 +18,10 @@ public final class BookingScheduleController {
         this.clock = clock;
     }
 
+    public List<Booking> allUpcoming() {
+        return bookings.findAllUpcoming(OffsetDateTime.now(clock));
+    }
+
     public List<Booking> upcomingByClassroom(UUID classroomId) {
         return bookings.findUpcomingByClassroom(classroomId, OffsetDateTime.now(clock));
     }

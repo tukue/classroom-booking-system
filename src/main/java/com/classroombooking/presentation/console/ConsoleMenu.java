@@ -23,16 +23,16 @@ public final class ConsoleMenu {
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
                        RoomSearchController roomSearchController, BookingScheduleController bookingSchedule,
                        ConsoleView view) {
-        this.classroomController = Objects.requireNonNull(classroomController);
+        this.classroomController = classroomController;
         this.bookingSchedule = bookingSchedule;
         this.customerController = Objects.requireNonNull(customerController);
-        this.roomSearchController = Objects.requireNonNull(roomSearchController);
+        this.roomSearchController = roomSearchController;
         this.view = Objects.requireNonNull(view);
     }
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice(bookingSchedule != null);
+            int choice = view.readMenuChoice(classroomController != null, roomSearchController != null, bookingSchedule != null);
             try {
                 switch (choice) {
                     case 0 -> {
@@ -41,19 +41,45 @@ public final class ConsoleMenu {
                     }
                     case 1 -> registerCustomer();
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
-                    case 3 -> view.showClassrooms(classroomController.listClassrooms());
-                    case 4 -> saveClassroom(null);
-                    case 5 -> updateClassroom();
-                    case 6 -> deleteClassroom();
-                    case 7 -> searchAvailableClassrooms();
+                    case 3, 4, 5, 6 -> manageClassrooms(choice);
+                    case 7 -> {
+                        if (roomSearchController == null) {
+                            view.showError("Choose one of the listed menu options.");
+                        } else {
+                            searchAvailableClassrooms();
+                        }
+                    }
                     case 8 -> showClassroomBookings();
                     case 9 -> showCustomerBookings();
+                    case 10 -> showAllUpcomingBookings();
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
                 view.showError(exception.getMessage());
             }
         }
+    }
+
+    private void manageClassrooms(int choice) {
+        if (classroomController == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        switch (choice) {
+            case 3 -> view.showClassrooms(classroomController.listClassrooms());
+            case 4 -> saveClassroom(null);
+            case 5 -> updateClassroom();
+            case 6 -> deleteClassroom();
+            default -> throw new IllegalArgumentException("Choose one of the listed menu options.");
+        }
+    }
+
+    private void showAllUpcomingBookings() {
+        if (bookingSchedule == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        view.showBookings(bookingSchedule.allUpcoming());
     }
 
     private void showClassroomBookings() {
@@ -75,7 +101,7 @@ public final class ConsoleMenu {
     }
 
     private void showCustomerBookings() {
-        if (bookingSchedule == null || classroomController == null) {
+        if (bookingSchedule == null) {
             view.showError("Choose one of the listed menu options.");
             return;
         }

@@ -16,6 +16,7 @@ import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
+import com.classroombooking.presentation.console.BookingScheduleController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.CustomerController;
@@ -33,6 +34,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -249,7 +251,7 @@ class DatabaseIntegrationTest {
     }
 
     @Test
-    void bookingViewsShowOnlyUpcomingBookingsForTheSelectedRoomOrCustomer() throws Exception {
+    void bookingViewsShowUpcomingBookingsInOrderWithTheRequestedScope() throws Exception {
         DatabaseManager database = DatabaseManager.getInstance();
         new DatabaseInitializer(database).initialize();
         var classrooms = new JdbcClassroomRepository(database);
@@ -289,6 +291,29 @@ class DatabaseIntegrationTest {
                         repository.findUpcomingByCustomer(customer, cutoff).stream().map(Booking::id).toList());
                 assertEquals(List.of(), repository.findUpcomingByClassroom(UUID.randomUUID(), cutoff));
 
+                List<UUID> expected = List.of(roomFirst, customerFirst, roomLast, unrelated);
+                assertEquals(expected, repository.findAllUpcoming(tomorrow).stream()
+                        .filter(booking -> booking.bookingUserId().equals(bookingUser)).map(Booking::id).toList());
+
+                String allUpcoming = runConsole("10\n0\n");
+                int previousPosition = -1;
+                for (UUID id : expected) {
+                    int position = allUpcoming.indexOf(id.toString());
+                    assertTrue(position > previousPosition, allUpcoming);
+                    previousPosition = position;
+                }
+                assertTrue(!allUpcoming.contains(past.toString()), allUpcoming);
+
+                var scheduleOnlyOutput = new ByteArrayOutputStream();
+                try (var output = new PrintStream(scheduleOnlyOutput, true, StandardCharsets.UTF_8)) {
+                    var view = new ConsoleView(new ByteArrayInputStream("10\n0\n".getBytes(StandardCharsets.UTF_8)), output);
+                    var customers = new CustomerController(new CustomerService(new JdbcCustomerRepository(database)));
+                    var schedules = new BookingScheduleController(repository, Clock.fixed(cutoff.toInstant(), ZoneOffset.UTC));
+                    new ConsoleMenu(null, customers, null, schedules, view).run();
+                }
+                String scheduleOnly = scheduleOnlyOutput.toString(StandardCharsets.UTF_8);
+                assertTrue(scheduleOnly.contains("10. View all upcoming bookings"), scheduleOnly);
+                assertBookingOutput(scheduleOnly, roomFirst, unrelated, past);
                 assertBookingOutput(runScheduleOption(8, room), roomFirst, roomLast, customerFirst, past, unrelated);
                 assertBookingOutput(runScheduleOption(9, customer), customerFirst, roomLast, roomFirst, past, unrelated);
                 assertTrue(runScheduleOption(8, UUID.randomUUID()).contains("Classroom not found."));
