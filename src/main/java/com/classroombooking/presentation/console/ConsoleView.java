@@ -27,10 +27,11 @@ public final class ConsoleView {
     }
 
     public int readMenuChoice() {
-        return readMenuChoice(true, true, false);
+        return readMenuChoice(true, true, false, false);
     }
 
-    int readMenuChoice(boolean classroomsEnabled, boolean roomSearchEnabled, boolean bookingSchedulesEnabled) {
+    int readMenuChoice(boolean classroomsEnabled, boolean roomSearchEnabled,
+                       boolean bookingSchedulesEnabled, boolean bookingCreationEnabled) {
         output.println("\nClassroom Booking System");
         output.println("1. Register customer");
         output.println("2. List customers");
@@ -49,6 +50,9 @@ public final class ConsoleView {
         if (bookingSchedulesEnabled) {
             output.println("9. View upcoming bookings by customer");
             output.println("10. View all upcoming bookings");
+        }
+        if (bookingCreationEnabled) {
+            output.println("11. Create booking");
         }
         output.println("0. Exit");
         return readInteger("Choose an option: ");

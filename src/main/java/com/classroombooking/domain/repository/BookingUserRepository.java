@@ -10,4 +10,6 @@ public interface BookingUserRepository {
     BookingUser save(BookingUser bookingUser);
 
     Optional<BookingUser> findById(UUID bookingUserId);
+
+    Optional<BookingUser> findByEmail(String email);
 }

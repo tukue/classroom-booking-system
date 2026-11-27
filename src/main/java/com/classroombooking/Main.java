@@ -1,21 +1,26 @@
 package com.classroombooking;
 
+import com.classroombooking.application.booking.BookingService;
 import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.roomsearch.RoomRequirementsFactory;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.infrastructure.database.DatabaseInitializer;
 import com.classroombooking.infrastructure.database.DatabaseManager;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingScheduleRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingUserRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
+import com.classroombooking.presentation.console.BookingController;
 import com.classroombooking.presentation.console.BookingScheduleController;
 import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.ConsoleMenu;
+import com.classroombooking.presentation.console.ConsoleView;
 import com.classroombooking.presentation.console.CustomerController;
 import com.classroombooking.presentation.console.RoomSearchController;
-import com.classroombooking.presentation.console.ConsoleView;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,7 +45,6 @@ public final class Main {
         }
     }
 
-    /** Runs the console with caller-provided streams and returns its exit status. */
     public static int run(InputStream input, PrintStream output, PrintStream error) {
         Objects.requireNonNull(input);
         return run(() -> new DatabaseInitializer(DatabaseManager.getInstance()),
@@ -70,21 +74,23 @@ public final class Main {
 
     private static void runConsoleMenu(InputStream input, PrintStream output) {
         DatabaseManager databaseManager = DatabaseManager.getInstance();
-        CustomerService customerService = new CustomerService(
-                new JdbcCustomerRepository(databaseManager));
-        ClassroomService classroomService = new ClassroomService(
-                new JdbcClassroomRepository(databaseManager),
-                new JdbcEquipmentRepository(databaseManager));
-        RoomSearchService roomSearchService = new RoomSearchService(
-                new JdbcClassroomRepository(databaseManager),
+        JdbcCustomerRepository customerRepository = new JdbcCustomerRepository(databaseManager);
+        JdbcClassroomRepository classroomRepository = new JdbcClassroomRepository(databaseManager);
+        JdbcEquipmentRepository equipmentRepository = new JdbcEquipmentRepository(databaseManager);
+        CustomerService customerService = new CustomerService(customerRepository);
+        ClassroomService classroomService = new ClassroomService(classroomRepository, equipmentRepository);
+        RoomRequirementsFactory requirementsFactory = new RoomRequirementsFactory(equipmentRepository);
+        RoomSearchService roomSearchService = new RoomSearchService(classroomRepository,
                 new JdbcBookingAvailabilityRepository(databaseManager));
-        RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
-                new JdbcEquipmentRepository(databaseManager));
+        RoomSearchController roomSearchController = new RoomSearchController(roomSearchService, requirementsFactory);
+        BookingService bookingService = new BookingService(new JdbcBookingRepository(databaseManager),
+                new JdbcBookingUserRepository(databaseManager), classroomRepository, customerRepository);
+        BookingController bookingController = new BookingController(bookingService, requirementsFactory);
+        BookingScheduleController bookingSchedule = new BookingScheduleController(
+                new JdbcBookingScheduleRepository(databaseManager), Clock.systemUTC());
         ConsoleMenu menu = new ConsoleMenu(new ClassroomController(classroomService),
-                new CustomerController(customerService),
-                roomSearchController,
-                new BookingScheduleController(new JdbcBookingScheduleRepository(databaseManager), Clock.systemUTC()),
-                new ConsoleView(input, output));
+                new CustomerController(customerService), roomSearchController, bookingController,
+                bookingSchedule, new ConsoleView(input, output));
         menu.run();
     }
 }

@@ -2,13 +2,18 @@ package com.classroombooking.presentation.console;
 
 import com.classroombooking.application.customer.CustomerService;
 import com.classroombooking.application.classroom.ClassroomService;
+import com.classroombooking.application.booking.BookingService;
 import com.classroombooking.application.roomsearch.RoomSearchService;
+import com.classroombooking.application.roomsearch.RoomRequirementsFactory;
 import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.Booking;
+import com.classroombooking.domain.model.BookingUser;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.Equipment;
 import com.classroombooking.domain.repository.BookingAvailabilityRepository;
+import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingUserRepository;
 import com.classroombooking.domain.repository.ClassroomRepository;
 import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.domain.repository.EquipmentRepository;
@@ -27,6 +32,22 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConsoleMenuTest {
+    @Test
+    void displaysEmptyAndCommentedBookingSchedules() {
+        ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+        try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
+            ConsoleView view = new ConsoleView(new ByteArrayInputStream(new byte[0]), output);
+            view.showBookings(List.of());
+            view.showBookings(List.of(new Booking(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), OffsetDateTime.parse("2026-12-01T09:00:00Z"),
+                    OffsetDateTime.parse("2026-12-01T10:00:00Z"), "Arrange projector")));
+        }
+        String display = outputBytes.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("No upcoming bookings found."));
+        assertTrue(display.contains("Upcoming bookings (UTC)"));
+        assertTrue(display.contains("Arrange projector"));
+    }
+
     @Test
     void registersListsAndExitsFromTheConsoleMenu() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -152,8 +173,14 @@ class ConsoleMenuTest {
                 equipmentRepository);
         ClassroomController classroomController = new ClassroomController(
                 new ClassroomService(classroomRepository, equipmentRepository));
+        InMemoryBookingUserRepository bookingUsers = new InMemoryBookingUserRepository();
+        BookingService bookingService = new BookingService(new InMemoryBookingRepository(bookingUsers),
+                bookingUsers, classroomRepository, customerRepository);
+        BookingController bookingController = new BookingController(bookingService,
+                new RoomRequirementsFactory(equipmentRepository));
         return new ConsoleMenu(classroomController,
-                new CustomerController(new CustomerService(customerRepository)), roomSearchController, view);
+                new CustomerController(new CustomerService(customerRepository)), roomSearchController,
+                bookingController, view);
     }
 
     private static final class InMemoryCustomerRepository implements CustomerRepository {
@@ -197,6 +224,77 @@ class ConsoleMenuTest {
         @Override
         public void deleteById(UUID customerId) {
             customers.removeIf(customer -> customer.id().equals(customerId));
+        }
+    }
+
+    private static final class InMemoryBookingRepository implements BookingRepository {
+        private final List<Booking> bookings = new ArrayList<>();
+        private final InMemoryBookingUserRepository bookingUsers;
+
+        private InMemoryBookingRepository(InMemoryBookingUserRepository bookingUsers) {
+            this.bookingUsers = bookingUsers;
+        }
+
+        @Override
+        public Booking save(Booking booking, BookingUser bookingUser) {
+            if (!findOverlapping(booking.classroomId(), booking.startsAt(), booking.endsAt()).isEmpty()) {
+                throw new IllegalArgumentException("The selected classroom is already booked for that time.");
+            }
+            BookingUser persistedUser = bookingUsers.findByEmail(bookingUser.email())
+                    .orElseGet(() -> bookingUsers.save(bookingUser));
+            Booking persisted = new Booking(booking.id(), booking.customerId(), persistedUser.id(),
+                    booking.classroomId(), booking.startsAt(), booking.endsAt(), booking.comments());
+            bookings.add(persisted);
+            return persisted;
+        }
+
+        @Override
+        public Optional<Booking> findById(UUID bookingId) {
+            return bookings.stream().filter(booking -> booking.id().equals(bookingId)).findFirst();
+        }
+
+        @Override
+        public List<Booking> findOverlapping(UUID classroomId, OffsetDateTime startsAt,
+                                             OffsetDateTime endsAt) {
+            return bookings.stream().filter(booking -> booking.classroomId().equals(classroomId)
+                    && booking.overlaps(startsAt, endsAt)).toList();
+        }
+
+        @Override
+        public List<Booking> findUpcomingByClassroom(UUID classroomId, OffsetDateTime from) {
+            return bookings.stream().filter(booking -> booking.classroomId().equals(classroomId)
+                    && !booking.startsAt().isBefore(from)).toList();
+        }
+
+        @Override
+        public List<Booking> findUpcomingByCustomer(UUID customerId, OffsetDateTime from) {
+            return bookings.stream().filter(booking -> booking.customerId().equals(customerId)
+                    && !booking.startsAt().isBefore(from)).toList();
+        }
+
+        @Override
+        public List<Booking> findAllUpcoming(OffsetDateTime from) {
+            return bookings.stream().filter(booking -> !booking.startsAt().isBefore(from)).toList();
+        }
+    }
+
+    private static final class InMemoryBookingUserRepository implements BookingUserRepository {
+        private final List<BookingUser> bookingUsers = new ArrayList<>();
+
+        @Override
+        public BookingUser save(BookingUser bookingUser) {
+            bookingUsers.add(bookingUser);
+            return bookingUser;
+        }
+
+        @Override
+        public Optional<BookingUser> findById(UUID bookingUserId) {
+            return bookingUsers.stream().filter(user -> user.id().equals(bookingUserId)).findFirst();
+        }
+
+        @Override
+        public Optional<BookingUser> findByEmail(String email) {
+            return bookingUsers.stream().filter(user -> user.email().equals(email)).findFirst();
         }
     }
 

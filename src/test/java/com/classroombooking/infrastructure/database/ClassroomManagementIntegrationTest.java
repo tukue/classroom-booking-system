@@ -1,15 +1,21 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.application.classroom.ClassroomService;
+import com.classroombooking.application.booking.BookingService;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.roomsearch.RoomRequirementsFactory;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Equipment;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingUserRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ClassroomController;
+import com.classroombooking.presentation.console.BookingController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.ConsoleView;
 import com.classroombooking.presentation.console.CustomerController;
@@ -148,9 +154,14 @@ class ClassroomManagementIntegrationTest {
         var view = new ConsoleView(input, new PrintStream(output, true, StandardCharsets.UTF_8));
         var classrooms = new ClassroomController(new ClassroomService(rooms, new JdbcEquipmentRepository(database)));
         var customers = new CustomerController(new CustomerService(new JdbcCustomerRepository(database)));
+        var equipment = new JdbcEquipmentRepository(database);
+        var requirements = new RoomRequirementsFactory(equipment);
         var searchService = new RoomSearchService(rooms, new JdbcBookingAvailabilityRepository(database));
-        var search = new RoomSearchController(searchService, new JdbcEquipmentRepository(database));
-        new ConsoleMenu(classrooms, customers, search, view).run();
+        var search = new RoomSearchController(searchService, requirements);
+        var bookingService = new BookingService(new JdbcBookingRepository(database),
+                new JdbcBookingUserRepository(database), rooms, new JdbcCustomerRepository(database));
+        var bookings = new BookingController(bookingService, requirements);
+        new ConsoleMenu(classrooms, customers, search, bookings, view).run();
         return output.toString(StandardCharsets.UTF_8);
     }
 }
