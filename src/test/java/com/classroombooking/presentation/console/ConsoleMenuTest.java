@@ -11,6 +11,7 @@ import com.classroombooking.domain.model.BookingUser;
 import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.Equipment;
+import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.BookingAvailabilityRepository;
 import com.classroombooking.domain.repository.BookingRepository;
 import com.classroombooking.domain.repository.BookingUserRepository;
@@ -39,9 +40,11 @@ class ConsoleMenuTest {
         Classroom classroom = new Classroom(UUID.randomUUID(), "Training Room", 20,
                 java.util.Set.of(projector), true);
         InMemoryCustomerRepository customers = new InMemoryCustomerRepository();
+        Customer bookingCustomer = customers.save(new IndividualCustomer(UUID.randomUUID(),
+                "Booking Customer", "booking.customer@example.test"));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         String input = "1\n2\nAlex Customer\nalex.customer@example.test\n"
-                + "11\n" + classroom.id() + "\nJordan Booker\njordan@example.test\n"
+                + "11\n" + bookingCustomer.id() + "\nJordan Booker\njordan@example.test\n"
                 + "2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n12\nPROJECTOR\ny\n"
                 + classroom.id() + "\nTeam workshop\n0\n";
         ConsoleMenu menu = menu(input, output, customers, List.of(classroom), List.of(), List.of(projector));
@@ -54,7 +57,7 @@ class ConsoleMenuTest {
         assertTrue(display.contains("Booking created:"));
         assertTrue(display.contains("Goodbye."));
         assertTrue(!display.contains("Error:"));
-        assertEquals(1, customers.findAll().size());
+        assertEquals(2, customers.findAll().size());
     }
 
     @Test
