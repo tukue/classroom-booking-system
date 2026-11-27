@@ -30,8 +30,33 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ConsoleMenuTest {
+    @Test
+    void completesCustomerBookingFlowThroughConsoleMenu() {
+        Equipment projector = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Classroom classroom = new Classroom(UUID.randomUUID(), "Training Room", 20,
+                java.util.Set.of(projector), true);
+        InMemoryCustomerRepository customers = new InMemoryCustomerRepository();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        String input = "1\n2\nAlex Customer\nalex.customer@example.test\n"
+                + "11\n" + classroom.id() + "\nJordan Booker\njordan@example.test\n"
+                + "2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n12\nPROJECTOR\ny\n"
+                + classroom.id() + "\nTeam workshop\n0\n";
+        ConsoleMenu menu = menu(input, output, customers, List.of(classroom), List.of(), List.of(projector));
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("Registered customer Alex Customer."));
+        assertTrue(display.contains("Training Room | capacity: 20 | accessible: yes"));
+        assertTrue(display.contains("Booking created:"));
+        assertTrue(display.contains("Goodbye."));
+        assertTrue(!display.contains("Error:"));
+        assertEquals(1, customers.findAll().size());
+    }
+
     @Test
     void displaysEmptyAndCommentedBookingSchedules() {
         ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
