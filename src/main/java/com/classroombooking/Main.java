@@ -6,9 +6,11 @@ import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.infrastructure.database.DatabaseInitializer;
 import com.classroombooking.infrastructure.database.DatabaseManager;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingScheduleRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
+import com.classroombooking.presentation.console.BookingScheduleController;
 import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.CustomerController;
@@ -16,8 +18,10 @@ import com.classroombooking.presentation.console.RoomSearchController;
 import com.classroombooking.presentation.console.ConsoleView;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -30,11 +34,17 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        int exitCode = run(() -> new DatabaseInitializer(DatabaseManager.getInstance()),
-                Main::runConsoleMenu, System.out, System.err);
+        int exitCode = run(System.in, System.out, System.err);
         if (exitCode != 0) {
             System.exit(exitCode);
         }
+    }
+
+    /** Runs the console with caller-provided streams and returns its exit status. */
+    public static int run(InputStream input, PrintStream output, PrintStream error) {
+        Objects.requireNonNull(input);
+        return run(() -> new DatabaseInitializer(DatabaseManager.getInstance()),
+                () -> runConsoleMenu(input, output), output, error);
     }
 
     static int run(Supplier<DatabaseInitializer> initializerFactory, Runnable application,
@@ -58,7 +68,7 @@ public final class Main {
         return 0;
     }
 
-    private static void runConsoleMenu() {
+    private static void runConsoleMenu(InputStream input, PrintStream output) {
         DatabaseManager databaseManager = DatabaseManager.getInstance();
         CustomerService customerService = new CustomerService(
                 new JdbcCustomerRepository(databaseManager));
@@ -72,7 +82,9 @@ public final class Main {
                 new JdbcEquipmentRepository(databaseManager));
         ConsoleMenu menu = new ConsoleMenu(new ClassroomController(classroomService),
                 new CustomerController(customerService),
-                roomSearchController, new ConsoleView(System.in, System.out));
+                roomSearchController,
+                new BookingScheduleController(new JdbcBookingScheduleRepository(databaseManager), Clock.systemUTC()),
+                new ConsoleView(input, output));
         menu.run();
     }
 }

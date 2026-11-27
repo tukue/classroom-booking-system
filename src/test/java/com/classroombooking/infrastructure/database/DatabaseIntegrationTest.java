@@ -5,13 +5,16 @@ import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
+import com.classroombooking.domain.model.Booking;
+import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.CompanyCustomer;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.CustomerRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingScheduleRepository;
+import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
-import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
 import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ConsoleMenu;
 import com.classroombooking.presentation.console.ClassroomController;
@@ -23,7 +26,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -32,7 +34,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,13 +57,7 @@ class DatabaseIntegrationTest {
 
         initializer.initialize();
         initializer.initialize();
-        InputStream originalInput = System.in;
-        try {
-            System.setIn(new ByteArrayInputStream("0\n".getBytes(StandardCharsets.UTF_8)));
-            Main.main(new String[0]);
-        } finally {
-            System.setIn(originalInput);
-        }
+        assertTrue(runConsole("0\n").contains("Classroom Booking System database is ready."));
 
         try (Connection first = databaseManager.openConnection();
              Connection second = databaseManager.openConnection()) {
@@ -246,6 +245,91 @@ class DatabaseIntegrationTest {
                     .filter(customer -> customer.email().equals(companyEmail)
                             || customer.email().equals(individualEmail))
                     .forEach(customer -> repository.deleteById(customer.id()));
+        }
+    }
+
+    @Test
+    void bookingViewsShowOnlyUpcomingBookingsForTheSelectedRoomOrCustomer() throws Exception {
+        DatabaseManager database = DatabaseManager.getInstance();
+        new DatabaseInitializer(database).initialize();
+        var classrooms = new JdbcClassroomRepository(database);
+        UUID room = UUID.randomUUID();
+        UUID otherRoom = UUID.randomUUID();
+        UUID customer = UUID.randomUUID();
+        UUID otherCustomer = UUID.randomUUID();
+        UUID bookingUser = UUID.randomUUID();
+        UUID roomFirst = UUID.randomUUID();
+        UUID roomLast = UUID.randomUUID();
+        UUID customerFirst = UUID.randomUUID();
+        UUID past = UUID.randomUUID();
+        UUID unrelated = UUID.randomUUID();
+        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
+        OffsetDateTime tomorrow = cutoff.plusDays(1);
+
+        try (Connection connection = database.openConnection()) {
+            classrooms.save(new Classroom(room, "Schedule room " + room, 10, Set.of(), false));
+            classrooms.save(new Classroom(otherRoom, "Schedule room " + otherRoom, 10, Set.of(), false));
+            try {
+                insertCustomer(connection, customer);
+                insertCustomer(connection, otherCustomer);
+                insertBookingUser(connection, bookingUser);
+                insertBooking(connection, roomLast, customer, bookingUser, room,
+                        tomorrow.plusHours(2), tomorrow.plusHours(3));
+                insertBooking(connection, roomFirst, otherCustomer, bookingUser, room, tomorrow, tomorrow.plusHours(1));
+                insertBooking(connection, customerFirst, customer, bookingUser, otherRoom,
+                        tomorrow.plusMinutes(30), tomorrow.plusHours(1));
+                insertBooking(connection, past, customer, bookingUser, room, cutoff.minusDays(1), cutoff.minusHours(1));
+                insertBooking(connection, unrelated, otherCustomer, bookingUser, otherRoom,
+                        tomorrow.plusHours(3), tomorrow.plusHours(4));
+
+                var repository = new JdbcBookingScheduleRepository(database);
+                assertEquals(List.of(roomFirst, roomLast),
+                        repository.findUpcomingByClassroom(room, tomorrow).stream().map(Booking::id).toList());
+                assertEquals(List.of(customerFirst, roomLast),
+                        repository.findUpcomingByCustomer(customer, cutoff).stream().map(Booking::id).toList());
+                assertEquals(List.of(), repository.findUpcomingByClassroom(UUID.randomUUID(), cutoff));
+
+                assertBookingOutput(runScheduleOption(8, room), roomFirst, roomLast, customerFirst, past, unrelated);
+                assertBookingOutput(runScheduleOption(9, customer), customerFirst, roomLast, roomFirst, past, unrelated);
+                assertTrue(runScheduleOption(8, UUID.randomUUID()).contains("Classroom not found."));
+            } finally {
+                executeDelete(connection, "DELETE FROM bookings WHERE booking_user_id = ?", bookingUser);
+                executeDelete(connection, "DELETE FROM booking_users WHERE booking_user_id = ?", bookingUser);
+                executeDelete(connection, "DELETE FROM customers WHERE customer_id = ?", customer);
+                executeDelete(connection, "DELETE FROM customers WHERE customer_id = ?", otherCustomer);
+                classrooms.deleteById(room);
+                classrooms.deleteById(otherRoom);
+            }
+        }
+    }
+
+    private String runScheduleOption(int option, UUID selection) {
+        return runConsole(option + "\n" + selection + "\n0\n");
+    }
+
+    private String runConsole(String commands) {
+        var input = new ByteArrayInputStream(commands.getBytes(StandardCharsets.UTF_8));
+        var output = new ByteArrayOutputStream();
+        var errors = new ByteArrayOutputStream();
+        try (var capture = new PrintStream(output, true, StandardCharsets.UTF_8);
+             var error = new PrintStream(errors, true, StandardCharsets.UTF_8)) {
+            assertEquals(0, Main.run(input, capture, error), () -> errors.toString(StandardCharsets.UTF_8));
+        }
+        return output.toString(StandardCharsets.UTF_8);
+    }
+
+    private void assertBookingOutput(String output, UUID first, UUID second, UUID... excluded) {
+        int firstPosition = output.indexOf(first.toString());
+        assertTrue(firstPosition >= 0 && output.indexOf(second.toString()) > firstPosition, output);
+        for (UUID id : excluded) {
+            assertTrue(!output.contains(id.toString()), output);
+        }
+    }
+
+    private void executeDelete(Connection connection, String sql, UUID id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, id);
+            statement.executeUpdate();
         }
     }
 

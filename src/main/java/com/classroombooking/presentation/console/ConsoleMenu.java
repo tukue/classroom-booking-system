@@ -7,16 +7,24 @@ import com.classroombooking.domain.model.Customer;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Runs the customer, classroom, and room-search console actions. */
+/** Runs the customer, classroom, and room-search, and booking schedule console actions. */
 public final class ConsoleMenu {
     private final ClassroomController classroomController;
     private final CustomerController customerController;
     private final RoomSearchController roomSearchController;
+    private final BookingScheduleController bookingSchedule;
     private final ConsoleView view;
 
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
                        RoomSearchController roomSearchController, ConsoleView view) {
+        this(classroomController, customerController, roomSearchController, null, view);
+    }
+
+    public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
+                       RoomSearchController roomSearchController, BookingScheduleController bookingSchedule,
+                       ConsoleView view) {
         this.classroomController = Objects.requireNonNull(classroomController);
+        this.bookingSchedule = bookingSchedule;
         this.customerController = Objects.requireNonNull(customerController);
         this.roomSearchController = Objects.requireNonNull(roomSearchController);
         this.view = Objects.requireNonNull(view);
@@ -24,7 +32,7 @@ public final class ConsoleMenu {
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice();
+            int choice = view.readMenuChoice(bookingSchedule != null);
             try {
                 switch (choice) {
                     case 0 -> {
@@ -38,10 +46,48 @@ public final class ConsoleMenu {
                     case 5 -> updateClassroom();
                     case 6 -> deleteClassroom();
                     case 7 -> searchAvailableClassrooms();
+                    case 8 -> showClassroomBookings();
+                    case 9 -> showCustomerBookings();
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
                 view.showError(exception.getMessage());
+            }
+        }
+    }
+
+    private void showClassroomBookings() {
+        if (bookingSchedule == null || classroomController == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        var classrooms = classroomController.listClassrooms();
+        view.showClassrooms(classrooms);
+        if (!classrooms.isEmpty()) {
+            UUID id = view.readClassroomId();
+            if (id != null) {
+                if (classrooms.stream().noneMatch(room -> room.id().equals(id))) {
+                    throw new IllegalArgumentException("Classroom not found.");
+                }
+                view.showBookings(bookingSchedule.upcomingByClassroom(id));
+            }
+        }
+    }
+
+    private void showCustomerBookings() {
+        if (bookingSchedule == null || classroomController == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        var customers = customerController.findAllCustomers();
+        view.showCustomers(customers);
+        if (!customers.isEmpty()) {
+            UUID id = view.readCustomerId();
+            if (id != null) {
+                if (customers.stream().noneMatch(customer -> customer.id().equals(id))) {
+                    throw new IllegalArgumentException("Customer not found.");
+                }
+                view.showBookings(bookingSchedule.upcomingByCustomer(id));
             }
         }
     }
