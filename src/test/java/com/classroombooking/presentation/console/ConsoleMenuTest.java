@@ -99,6 +99,24 @@ class ConsoleMenuTest {
     }
 
     @Test
+    void reportsAmbiguousEquipmentAndKeepsTheMenuRunning() {
+        Equipment projectorUppercase = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Equipment projectorLowercase = new Equipment(UUID.randomUUID(), "projector");
+        Classroom room = new Classroom(UUID.randomUUID(), "Projector Room", 20,
+                java.util.Set.of(projectorUppercase), true);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ConsoleMenu menu = menu("7\n2026-12-02T09:00:00Z\n2026-12-02T10:00:00Z\n"
+                        + "10\nPROJECTOR\ny\n0\n", output, new InMemoryCustomerRepository(),
+                List.of(room), List.of(), List.of(projectorUppercase, projectorLowercase));
+
+        menu.run();
+
+        String display = output.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("Equipment name is ambiguous: PROJECTOR"));
+        assertTrue(display.contains("Goodbye."));
+    }
+
+    @Test
     void stopsSearchWhenTimeInputEndsBeforeCapacity() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ConsoleMenu menu = menu("7\n2026-12-02T09:00:00Z\n", output,

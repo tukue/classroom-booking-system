@@ -47,7 +47,42 @@ class RoomSearchControllerTest {
                 "not-a-time", "2026-12-02T10:00:00Z", 10, "", false));
     }
 
+    @Test
+    void unrelatedEquipmentCanBeSelectedWhenOtherNamesNormalizeToDuplicates() {
+        Equipment projectorUppercase = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Equipment projectorLowercase = new Equipment(UUID.randomUUID(), "projector");
+        Equipment whiteboard = new Equipment(UUID.randomUUID(), "WHITEBOARD");
+        Classroom classroom = new Classroom(UUID.randomUUID(), "Whiteboard Room", 20,
+                Set.of(whiteboard), true);
+        RoomSearchController controller = controller(classroom,
+                List.of(projectorUppercase, projectorLowercase, whiteboard));
+
+        List<Classroom> result = controller.findAvailableRooms(
+                "2026-12-02T09:00:00Z", "2026-12-02T10:00:00Z", 10,
+                "WHITEBOARD", false);
+
+        assertEquals(List.of(classroom), result);
+    }
+
+    @Test
+    void rejectsAnEquipmentNameThatIsAmbiguousWhenRequested() {
+        Equipment projectorUppercase = new Equipment(UUID.randomUUID(), "PROJECTOR");
+        Equipment projectorLowercase = new Equipment(UUID.randomUUID(), "projector");
+        Classroom classroom = new Classroom(UUID.randomUUID(), "Projector Room", 20,
+                Set.of(projectorUppercase), true);
+        RoomSearchController controller = controller(classroom,
+                List.of(projectorUppercase, projectorLowercase));
+
+        assertThrows(IllegalArgumentException.class, () -> controller.findAvailableRooms(
+                "2026-12-02T09:00:00Z", "2026-12-02T10:00:00Z", 10,
+                "PROJECTOR", false));
+    }
+
     private RoomSearchController controller(Classroom classroom, Equipment equipment) {
+        return controller(classroom, List.of(equipment));
+    }
+
+    private RoomSearchController controller(Classroom classroom, List<Equipment> equipment) {
         ClassroomRepository classroomRepository = new ClassroomRepository() {
             @Override
             public Classroom save(Classroom room) {
@@ -75,7 +110,7 @@ class RoomSearchControllerTest {
             }
         };
         BookingAvailabilityRepository bookingRepository = (startsAt, endsAt) -> List.<Booking>of();
-        EquipmentRepository equipmentRepository = () -> List.of(equipment);
+        EquipmentRepository equipmentRepository = () -> equipment;
         return new RoomSearchController(new RoomSearchService(classroomRepository, bookingRepository),
                 equipmentRepository);
     }

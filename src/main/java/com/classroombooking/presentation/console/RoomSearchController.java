@@ -14,7 +14,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Converts console room-search criteria into the application service request. */
@@ -53,16 +52,19 @@ public final class RoomSearchController {
         if (input == null || input.isBlank()) {
             return Set.of();
         }
-        Map<String, Equipment> catalog = equipmentRepository.findAll().stream()
-                .collect(Collectors.toMap(equipment -> normalize(equipment.name()), Function.identity()));
+        Map<String, List<Equipment>> catalog = equipmentRepository.findAll().stream()
+                .collect(Collectors.groupingBy(equipment -> normalize(equipment.name())));
         Set<Equipment> requiredEquipment = new LinkedHashSet<>();
         for (String item : input.split(",")) {
             String name = normalize(item);
-            Equipment equipment = catalog.get(name);
-            if (equipment == null) {
+            List<Equipment> matches = catalog.get(name);
+            if (matches == null) {
                 throw new IllegalArgumentException("Unknown equipment: " + item.strip());
             }
-            requiredEquipment.add(equipment);
+            if (matches.size() > 1) {
+                throw new IllegalArgumentException("Equipment name is ambiguous: " + item.strip());
+            }
+            requiredEquipment.add(matches.get(0));
         }
         return Set.copyOf(requiredEquipment);
     }

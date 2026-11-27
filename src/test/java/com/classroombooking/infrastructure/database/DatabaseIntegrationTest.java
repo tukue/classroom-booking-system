@@ -257,17 +257,16 @@ class DatabaseIntegrationTest {
         UUID customerId = UUID.randomUUID();
         UUID bookingUserId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
-        UUID classroomId;
-        try (Connection connection = databaseManager.openConnection()) {
-            insertCustomer(connection, customerId);
-            insertBookingUser(connection, bookingUserId);
-            classroomId = findClassroomId(connection, "Training Room 05");
-            insertBooking(connection, bookingId, customerId, bookingUserId, classroomId,
-                    OffsetDateTime.parse("2026-12-02T09:00:00Z"),
-                    OffsetDateTime.parse("2026-12-02T10:00:00Z"));
-        }
-
         try {
+            try (Connection connection = databaseManager.openConnection()) {
+                insertCustomer(connection, customerId);
+                insertBookingUser(connection, bookingUserId);
+                UUID classroomId = findClassroomId(connection, "Training Room 05");
+                insertBooking(connection, bookingId, customerId, bookingUserId, classroomId,
+                        OffsetDateTime.parse("2026-12-02T09:00:00Z"),
+                        OffsetDateTime.parse("2026-12-02T10:00:00Z"));
+            }
+
             RoomSearchService roomSearchService = new RoomSearchService(
                     new JdbcClassroomRepository(databaseManager),
                     new JdbcBookingAvailabilityRepository(databaseManager));
