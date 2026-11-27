@@ -34,6 +34,7 @@ public final class ConsoleView {
         output.println("5. Update classroom");
         output.println("6. Delete classroom");
         output.println("7. Search available classrooms");
+        output.println("8. Create booking");
         output.println("0. Exit");
         return readInteger("Choose an option: ");
     }

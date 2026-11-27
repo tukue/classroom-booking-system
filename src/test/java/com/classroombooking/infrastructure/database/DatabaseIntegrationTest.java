@@ -1,14 +1,25 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
+import com.classroombooking.application.booking.BookingConflictException;
+import com.classroombooking.application.booking.BookingService;
 import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.roomsearch.RoomRequirementsFactory;
 import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
+import com.classroombooking.domain.model.Booking;
+import com.classroombooking.domain.model.BookingRequest;
+import com.classroombooking.domain.model.BookingUser;
 import com.classroombooking.domain.model.CompanyCustomer;
+import com.classroombooking.domain.model.Classroom;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
+import com.classroombooking.domain.repository.BookingRepository;
+import com.classroombooking.domain.repository.BookingUserRepository;
 import com.classroombooking.domain.repository.CustomerRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingUserRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
 import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
@@ -18,6 +29,7 @@ import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.CustomerController;
 import com.classroombooking.presentation.console.RoomSearchController;
 import com.classroombooking.presentation.console.ConsoleView;
+import com.classroombooking.presentation.console.BookingController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -38,6 +50,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -226,7 +239,7 @@ class DatabaseIntegrationTest {
             ConsoleView view = new ConsoleView(
                     new ByteArrayInputStream(menuInput.getBytes(StandardCharsets.UTF_8)), output);
             new ConsoleMenu(createClassroomController(databaseManager), controller,
-                    roomSearchController, view).run();
+                    roomSearchController, createBookingController(databaseManager), view).run();
         }
 
         try {
@@ -281,7 +294,7 @@ class DatabaseIntegrationTest {
                 ConsoleView view = new ConsoleView(
                         new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)), output);
                 new ConsoleMenu(createClassroomController(databaseManager), customerController,
-                        roomSearchController, view).run();
+                        roomSearchController, createBookingController(databaseManager), view).run();
             }
 
             String result = outputBytes.toString(StandardCharsets.UTF_8);
@@ -289,6 +302,81 @@ class DatabaseIntegrationTest {
             assertTrue(!result.contains("Training Room 05"));
         } finally {
             deleteBookingFixtures(databaseManager, bookingId, bookingUserId, customerId);
+        }
+    }
+
+    @Test
+    void consoleBookingPersistsAssociationsCommentsAndRejectsConflicts() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+        JdbcCustomerRepository customers = new JdbcCustomerRepository(databaseManager);
+        JdbcClassroomRepository classrooms = new JdbcClassroomRepository(databaseManager);
+        JdbcEquipmentRepository equipmentRepository = new JdbcEquipmentRepository(databaseManager);
+        RoomRequirementsFactory requirementsFactory = new RoomRequirementsFactory(equipmentRepository);
+        BookingRepository bookings = new JdbcBookingRepository(databaseManager);
+        BookingUserRepository bookingUsers = new JdbcBookingUserRepository(databaseManager);
+
+        String suffix = UUID.randomUUID().toString();
+        Customer customer = customers.save(new CompanyCustomer(UUID.randomUUID(),
+                "Booking E2E " + suffix, "booking-e2e-" + suffix + "@example.test"));
+        Classroom room = classrooms.findAll().stream()
+                .filter(classroom -> classroom.name().equals("Training Room 07"))
+                .findFirst().orElseThrow();
+        OffsetDateTime startsAt = OffsetDateTime.parse("2026-12-03T09:00:00Z");
+        OffsetDateTime endsAt = OffsetDateTime.parse("2026-12-03T10:00:00Z");
+        String bookingUserEmail = "booking-user-" + suffix + "@example.test";
+        BookingService service = new BookingService(bookings, bookingUsers, classrooms, customers);
+        BookingController bookingController = new BookingController(service, requirementsFactory);
+        RoomSearchController searchController = new RoomSearchController(
+                new RoomSearchService(classrooms, new JdbcBookingAvailabilityRepository(databaseManager)),
+                requirementsFactory);
+        ClassroomController classroomController = createClassroomController(databaseManager);
+        CustomerController customerController = new CustomerController(new CustomerService(customers));
+        String input = "8\n" + customer.id() + "\nBooking Operator\n" + bookingUserEmail + "\n"
+                + startsAt + "\n" + endsAt + "\n20\nPROJECTOR\ny\n" + room.id()
+                + "\nAllergy: peanuts\n0\n";
+        ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+
+        try {
+            try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
+                ConsoleView view = new ConsoleView(
+                        new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)), output);
+                new ConsoleMenu(classroomController, customerController, searchController,
+                        bookingController, view).run();
+            }
+
+            List<Booking> customerBookings = bookings.findUpcomingByCustomer(customer.id(), startsAt.minusDays(1));
+            assertEquals(1, customerBookings.size());
+            Booking savedBooking = customerBookings.getFirst();
+            assertEquals(customer.id(), savedBooking.customerId());
+            assertEquals(room.id(), savedBooking.classroomId());
+            assertEquals(startsAt, savedBooking.startsAt());
+            assertEquals(endsAt, savedBooking.endsAt());
+            assertEquals("Allergy: peanuts", savedBooking.comments());
+            assertEquals(savedBooking, bookings.findById(savedBooking.id()).orElseThrow());
+            assertTrue(bookings.findUpcomingByClassroom(room.id(), startsAt.minusDays(1))
+                    .contains(savedBooking));
+            assertTrue(bookings.findAllUpcoming(startsAt.minusDays(1)).contains(savedBooking));
+
+            BookingUser bookingUser = bookingUsers.findByEmail(bookingUserEmail).orElseThrow();
+            assertEquals("Booking Operator", bookingUser.name());
+            assertEquals(bookingUser.id(), savedBooking.bookingUserId());
+            assertTrue(outputBytes.toString(StandardCharsets.UTF_8).contains("Booking created:"));
+
+            BookingRequest conflictingRequest = new BookingRequest(customer.id(), "Booking Operator",
+                    bookingUserEmail, room.id(), startsAt, endsAt,
+                    requirementsFactory.create(20, "PROJECTOR", true), null);
+            assertThrows(BookingConflictException.class,
+                    () -> service.createBooking(conflictingRequest));
+
+            BookingRequest adjacentRequest = new BookingRequest(customer.id(), "Booking Operator",
+                    bookingUserEmail, room.id(), endsAt, endsAt.plusHours(1),
+                    requirementsFactory.create(20, "PROJECTOR", true), null);
+            Booking adjacentBooking = service.createBooking(adjacentRequest);
+            assertNull(bookings.findById(adjacentBooking.id()).orElseThrow().comments());
+            assertEquals(bookingUser.id(), adjacentBooking.bookingUserId());
+        } finally {
+            deleteBookingFixturesForCustomer(databaseManager, customer.id(), bookingUserEmail);
         }
     }
 
@@ -348,6 +436,16 @@ class DatabaseIntegrationTest {
                 new JdbcEquipmentRepository(databaseManager)));
     }
 
+    private BookingController createBookingController(DatabaseManager databaseManager) {
+        JdbcCustomerRepository customers = new JdbcCustomerRepository(databaseManager);
+        JdbcClassroomRepository classrooms = new JdbcClassroomRepository(databaseManager);
+        JdbcEquipmentRepository equipment = new JdbcEquipmentRepository(databaseManager);
+        RoomRequirementsFactory requirements = new RoomRequirementsFactory(equipment);
+        BookingService service = new BookingService(new JdbcBookingRepository(databaseManager),
+                new JdbcBookingUserRepository(databaseManager), classrooms, customers);
+        return new BookingController(service, requirements);
+    }
+
     private UUID findClassroomId(Connection connection, String classroomName) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT classroom_id FROM classrooms WHERE name = ?")) {
@@ -388,6 +486,27 @@ class DatabaseIntegrationTest {
             try (PreparedStatement statement = connection.prepareStatement(
                     "DELETE FROM booking_users WHERE booking_user_id = ?")) {
                 statement.setObject(1, bookingUserId);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM customers WHERE customer_id = ?")) {
+                statement.setObject(1, customerId);
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    private void deleteBookingFixturesForCustomer(DatabaseManager databaseManager, UUID customerId,
+                                                   String bookingUserEmail) throws SQLException {
+        try (Connection connection = databaseManager.openConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM bookings WHERE customer_id = ?")) {
+                statement.setObject(1, customerId);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM booking_users WHERE email = ?")) {
+                statement.setString(1, bookingUserEmail);
                 statement.executeUpdate();
             }
             try (PreparedStatement statement = connection.prepareStatement(

@@ -12,13 +12,16 @@ public final class ConsoleMenu {
     private final ClassroomController classroomController;
     private final CustomerController customerController;
     private final RoomSearchController roomSearchController;
+    private final BookingController bookingController;
     private final ConsoleView view;
 
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
-                       RoomSearchController roomSearchController, ConsoleView view) {
+                       RoomSearchController roomSearchController, BookingController bookingController,
+                       ConsoleView view) {
         this.classroomController = Objects.requireNonNull(classroomController);
         this.customerController = Objects.requireNonNull(customerController);
         this.roomSearchController = Objects.requireNonNull(roomSearchController);
+        this.bookingController = Objects.requireNonNull(bookingController);
         this.view = Objects.requireNonNull(view);
     }
 
@@ -38,6 +41,7 @@ public final class ConsoleMenu {
                     case 5 -> updateClassroom();
                     case 6 -> deleteClassroom();
                     case 7 -> searchAvailableClassrooms();
+                    case 8 -> createBooking();
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
@@ -114,6 +118,48 @@ public final class ConsoleMenu {
         boolean accessibilityRequired = view.readYesNo("Accessibility required? (yes/no): ");
         view.showAvailableClassrooms(roomSearchController.findAvailableRooms(
                 startsAt, endsAt, capacity, requiredEquipment, accessibilityRequired));
+    }
+
+    private void createBooking() {
+        var customers = customerController.findAllCustomers();
+        view.showCustomers(customers);
+        if (customers.isEmpty()) {
+            view.showError("Register a customer before creating a booking.");
+            return;
+        }
+
+        String customerId = view.readText("Customer ID: ");
+        String bookingUserName = view.readText("Booking user name: ");
+        String bookingUserEmail = view.readText("Booking user email: ");
+        String startsAt = view.readText("Start time (ISO-8601 with offset): ");
+        String endsAt = view.readText("End time (ISO-8601 with offset): ");
+        if (customerId == null || bookingUserName == null || bookingUserEmail == null
+                || startsAt == null || endsAt == null) {
+            return;
+        }
+
+        int capacity = view.readInteger("Required capacity: ");
+        view.showEquipmentOptions(roomSearchController.findAllEquipment());
+        String requiredEquipment = view.readText("Required equipment (comma-separated, optional): ");
+        if (requiredEquipment == null) {
+            return;
+        }
+        boolean accessibilityRequired = view.readYesNo("Accessibility required? (yes/no): ");
+        var availableRooms = roomSearchController.findAvailableRooms(startsAt, endsAt,
+                capacity, requiredEquipment, accessibilityRequired);
+        view.showAvailableClassrooms(availableRooms);
+        if (availableRooms.isEmpty()) {
+            return;
+        }
+
+        String classroomId = view.readText("Classroom ID to book: ");
+        if (classroomId == null) {
+            return;
+        }
+        String comments = view.readText("Optional comments (press Enter for none): ");
+        var booking = bookingController.createBooking(customerId, bookingUserName, bookingUserEmail,
+                classroomId, startsAt, endsAt, capacity, requiredEquipment, accessibilityRequired, comments);
+        view.showMessage("Booking created: " + booking.id() + ".");
     }
 
 }

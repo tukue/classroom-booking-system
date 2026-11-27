@@ -43,7 +43,7 @@ flowchart TD
 | 1. SQL/JDBC foundation | None | Provides PostgreSQL schema, connection management, and seed data. |
 | 2. Customer registration | 1 | Customers need durable SQL/JDBC persistence. |
 | 3. Classroom management | 1 | Classroom and equipment inventory is stored in PostgreSQL. |
-| 4. Available-room search | 1, 3 | Search filters classroom attributes and existing booking rows. Use test fixtures for overlapping bookings until booking creation is implemented. |
+| 4. Available-room search | 1, 3 | Search filters classroom attributes and any existing booking rows; booking creation supplies live booking data. |
 | 5. Create a booking | 1, 2, 3, 4 | A booking references a registered customer and booking user, reserves a managed classroom, and rechecks availability. |
 | 6. View bookings by room/customer | 1, 2, 3, 5 | These queries need saved bookings and their classroom/customer associations. |
 | 7. View all upcoming bookings | 1, 5 | This view needs booking rows to query and sort. |
@@ -83,7 +83,7 @@ flowchart TD
 
 **Done when:** both customer types can be registered, saved through JDBC, loaded again, and displayed correctly. This feature is implemented and covered by console and JDBC integration tests.
 
-### 3. Classroom management
+### 3. Classroom management — implemented
 
 **Branch:** `feature/classroom-management`
 
@@ -96,7 +96,7 @@ flowchart TD
 
 **View:** prompt for classroom name, seating capacity, equipment, and accessibility; display inventory/results.
 
-**Done when:** classroom data and equipment survive a database reload, and the console can manage the 20-room inventory.
+**Done when:** classroom data and equipment survive a database reload, and the console can manage the 20-room inventory. This feature is implemented with JDBC CRUD, console MVC actions, and PostgreSQL integration coverage.
 
 ### 4. Available-room search — implemented
 
@@ -114,7 +114,7 @@ flowchart TD
 
 **Done when:** tests cover each filter and confirm that overlapping bookings make a room unavailable while non-overlapping times remain available. This feature is implemented through the console and JDBC repositories and covered by unit and PostgreSQL integration tests.
 
-### 5. Create a booking
+### 5. Create a booking — implemented
 
 **Branch:** `feature/create-booking`
 
@@ -128,7 +128,7 @@ flowchart TD
 
 **View:** collect the booking user, customer, room, date/time, requirements, and optional comments; display confirmation or a clear reason for rejection.
 
-**Done when:** a valid booking is persisted and linked to its customer, booking user, and classroom; invalid requirements and conflicting bookings are rejected; comments may be omitted.
+**Done when:** a valid booking is persisted and linked to its customer, booking user, and classroom; invalid requirements and conflicting bookings are rejected; comments may be omitted. This feature is implemented with transactional JDBC persistence and console/PostgreSQL integration tests.
 
 ### 6. View bookings by room and customer
 
