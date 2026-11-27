@@ -10,6 +10,44 @@ Implement and integrate one feature at a time. Each feature should have its own 
 - Add meaningful automated tests as each feature is implemented; use JDBC integration tests for database behavior and keep line coverage at or above 90%.
 - Keep the View responsible for console input/output, the Controller responsible for coordinating a user action, and the Model responsible for domain rules and persistence-facing use cases.
 
+## Feature dependencies
+
+The arrows below indicate prerequisite features, not the order teams must work in. For example, customer registration and classroom management can proceed independently once the SQL/JDBC foundation is ready.
+
+```mermaid
+flowchart TD
+    F1[1. SQL/JDBC foundation]
+    F2[2. Customer registration]
+    F3[3. Classroom management]
+    F4[4. Available-room search]
+    F5[5. Create a booking]
+    F6[6. View bookings by room/customer]
+    F7[7. View all upcoming bookings]
+
+    F1 --> F2
+    F1 --> F3
+    F1 --> F4
+    F3 --> F4
+    F1 --> F5
+    F2 --> F5
+    F3 --> F5
+    F4 --> F5
+    F2 --> F6
+    F3 --> F6
+    F5 --> F6
+    F5 --> F7
+```
+
+| Feature | Prerequisites | Why |
+| --- | --- | --- |
+| 1. SQL/JDBC foundation | None | Provides PostgreSQL schema, connection management, and seed data. |
+| 2. Customer registration | 1 | Customers need durable SQL/JDBC persistence. |
+| 3. Classroom management | 1 | Classroom and equipment inventory is stored in PostgreSQL. |
+| 4. Available-room search | 1, 3 | Search filters classroom attributes and existing booking rows. Use test fixtures for overlapping bookings until booking creation is implemented. |
+| 5. Create a booking | 1, 2, 3, 4 | A booking references a registered customer and booking user, reserves a managed classroom, and rechecks availability. |
+| 6. View bookings by room/customer | 1, 2, 3, 5 | These queries need saved bookings and their classroom/customer associations. |
+| 7. View all upcoming bookings | 1, 5 | This view needs booking rows to query and sort. |
+
 ## Feature sequence
 
 ### 1. SQL/JDBC foundation — implemented
@@ -60,7 +98,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **Done when:** classroom data and equipment survive a database reload, and the console can manage the 20-room inventory.
 
-### 4. Available-room search
+### 4. Available-room search — implemented
 
 **Branch:** `feature/available-room-search`
 
@@ -74,7 +112,7 @@ Implement and integrate one feature at a time. Each feature should have its own 
 
 **View:** prompt for date/time, capacity, equipment, and accessibility; show matching classrooms or an empty result.
 
-**Done when:** tests cover each filter and confirm that overlapping bookings make a room unavailable while non-overlapping times remain available.
+**Done when:** tests cover each filter and confirm that overlapping bookings make a room unavailable while non-overlapping times remain available. This feature is implemented through the console and JDBC repositories and covered by unit and PostgreSQL integration tests.
 
 ### 5. Create a booking
 

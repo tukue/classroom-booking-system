@@ -18,7 +18,8 @@ import java.util.UUID;
 
 public final class JdbcClassroomRepository implements ClassroomRepository {
     private static final String SELECT = """
-            SELECT c.classroom_id, c.name, c.seating_capacity, c.accessible, e.equipment_id, e.name AS equipment_name
+            SELECT c.classroom_id, c.name, c.seating_capacity, c.accessible,
+                   e.equipment_id, e.name AS equipment_name
             FROM classrooms c
             LEFT JOIN classroom_equipment ce ON ce.classroom_id = c.classroom_id
             LEFT JOIN equipment e ON e.equipment_id = ce.equipment_id
@@ -27,7 +28,7 @@ public final class JdbcClassroomRepository implements ClassroomRepository {
     private final ConnectionFactory connections;
 
     public JdbcClassroomRepository(ConnectionFactory connections) {
-        this.connections = connections;
+        this.connections = Objects.requireNonNull(connections);
     }
 
     @Override
@@ -48,7 +49,7 @@ public final class JdbcClassroomRepository implements ClassroomRepository {
     }
 
     private void write(Classroom classroom, String sql, boolean replaceEquipment) {
-        try (var connection = connections.openConnection()) {
+        try (Connection connection = connections.openConnection()) {
             connection.setAutoCommit(false);
             try (var statement = connection.prepareStatement(sql)) {
                 statement.setString(1, classroom.name());
@@ -75,8 +76,10 @@ public final class JdbcClassroomRepository implements ClassroomRepository {
             }
         } catch (SQLException exception) {
             throw switch (exception.getSQLState() == null ? "" : exception.getSQLState()) {
-                case "23505" -> new IllegalArgumentException("A classroom with that name already exists.", exception);
-                case "23503" -> new IllegalArgumentException("Selected equipment is no longer available.", exception);
+                case "23505" -> new IllegalArgumentException(
+                        "A classroom with that name already exists.", exception);
+                case "23503" -> new IllegalArgumentException(
+                        "Selected equipment is no longer available.", exception);
                 default -> new PersistenceException("Unable to save the classroom.", exception);
             };
         }
