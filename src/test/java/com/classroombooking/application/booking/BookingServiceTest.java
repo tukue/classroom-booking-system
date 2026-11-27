@@ -55,6 +55,7 @@ class BookingServiceTest {
                         time("11:00:00Z"), time("12:00:00Z"),
                         new RoomRequirements(20, Set.of(fixture.projector, fixture.whiteboard), true), null)));
         assertEquals(1, fixture.bookings.findAll().size());
+        assertEquals(1, fixture.bookingUsers.findAll().size());
     }
 
     @Test
@@ -83,7 +84,7 @@ class BookingServiceTest {
         private final MemoryCustomers customers = new MemoryCustomers();
         private final MemoryClassrooms classrooms = new MemoryClassrooms();
         private final MemoryBookingUsers bookingUsers = new MemoryBookingUsers();
-        private final MemoryBookings bookings = new MemoryBookings();
+        private final MemoryBookings bookings = new MemoryBookings(bookingUsers);
         private final BookingService service;
 
         private Fixture(boolean accessible) {
@@ -189,14 +190,23 @@ class BookingServiceTest {
 
     private static final class MemoryBookings implements BookingRepository {
         private final List<Booking> bookings = new ArrayList<>();
+        private final MemoryBookingUsers bookingUsers;
+
+        private MemoryBookings(MemoryBookingUsers bookingUsers) {
+            this.bookingUsers = bookingUsers;
+        }
 
         @Override
-        public Booking save(Booking booking) {
+        public Booking save(Booking booking, BookingUser bookingUser) {
             if (!findOverlapping(booking.classroomId(), booking.startsAt(), booking.endsAt()).isEmpty()) {
                 throw new BookingConflictException("Room is already booked.");
             }
-            bookings.add(booking);
-            return booking;
+            BookingUser persistedUser = bookingUsers.findByEmail(bookingUser.email())
+                    .orElseGet(() -> bookingUsers.save(bookingUser));
+            Booking persisted = new Booking(booking.id(), booking.customerId(), persistedUser.id(),
+                    booking.classroomId(), booking.startsAt(), booking.endsAt(), booking.comments());
+            bookings.add(persisted);
+            return persisted;
         }
 
         @Override

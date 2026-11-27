@@ -43,10 +43,10 @@ public final class BookingService {
         }
 
         BookingUser bookingUser = bookingUserRepository.findByEmail(request.bookingUserEmail())
-                .orElseGet(() -> bookingUserRepository.save(new BookingUser(
-                        UUID.randomUUID(), request.bookingUserName(), request.bookingUserEmail())));
+                .orElseGet(() -> new BookingUser(
+                        UUID.randomUUID(), request.bookingUserName(), request.bookingUserEmail()));
         Booking booking = new Booking(UUID.randomUUID(), customer.id(), bookingUser.id(), classroom.id(),
                 request.startsAt(), request.endsAt(), request.comments());
-        return bookingRepository.save(booking);
+        return bookingRepository.save(booking, bookingUser);
     }
 }

@@ -7,12 +7,13 @@ import com.classroombooking.domain.model.Customer;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Runs the customer, classroom, and room-search console actions. */
+/** Runs the customer, classroom, and room-search, and booking schedule console actions. */
 public final class ConsoleMenu {
     private final ClassroomController classroomController;
     private final CustomerController customerController;
     private final RoomSearchController roomSearchController;
     private final BookingController bookingController;
+    private final BookingScheduleController bookingSchedule;
     private final ConsoleView view;
 
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
@@ -21,13 +22,32 @@ public final class ConsoleMenu {
         this.classroomController = Objects.requireNonNull(classroomController);
         this.customerController = Objects.requireNonNull(customerController);
         this.roomSearchController = Objects.requireNonNull(roomSearchController);
-        this.bookingController = Objects.requireNonNull(bookingController);
+        this.bookingController = bookingController;
+        this.bookingSchedule = null;
+        this.view = Objects.requireNonNull(view);
+    }
+
+    public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
+                       RoomSearchController roomSearchController, BookingScheduleController bookingSchedule,
+                       ConsoleView view) {
+        this(classroomController, customerController, roomSearchController, null, bookingSchedule, view);
+    }
+
+    public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
+                       RoomSearchController roomSearchController, BookingController bookingController,
+                       BookingScheduleController bookingSchedule, ConsoleView view) {
+        this.classroomController = classroomController;
+        this.customerController = Objects.requireNonNull(customerController);
+        this.roomSearchController = roomSearchController;
+        this.bookingController = bookingController;
+        this.bookingSchedule = bookingSchedule;
         this.view = Objects.requireNonNull(view);
     }
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice();
+            int choice = view.readMenuChoice(classroomController != null, roomSearchController != null,
+                    bookingSchedule != null, bookingController != null);
             try {
                 switch (choice) {
                     case 0 -> {
@@ -36,16 +56,80 @@ public final class ConsoleMenu {
                     }
                     case 1 -> registerCustomer();
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
-                    case 3 -> view.showClassrooms(classroomController.listClassrooms());
-                    case 4 -> saveClassroom(null);
-                    case 5 -> updateClassroom();
-                    case 6 -> deleteClassroom();
-                    case 7 -> searchAvailableClassrooms();
-                    case 8 -> createBooking();
+                    case 3, 4, 5, 6 -> manageClassrooms(choice);
+                    case 7 -> {
+                        if (roomSearchController == null) {
+                            view.showError("Choose one of the listed menu options.");
+                        } else {
+                            searchAvailableClassrooms();
+                        }
+                    }
+                    case 8 -> showClassroomBookings();
+                    case 9 -> showCustomerBookings();
+                    case 10 -> showAllUpcomingBookings();
+                    case 11 -> createBooking();
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
                 view.showError(exception.getMessage());
+            }
+        }
+    }
+
+    private void manageClassrooms(int choice) {
+        if (classroomController == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        switch (choice) {
+            case 3 -> view.showClassrooms(classroomController.listClassrooms());
+            case 4 -> saveClassroom(null);
+            case 5 -> updateClassroom();
+            case 6 -> deleteClassroom();
+            default -> throw new IllegalArgumentException("Choose one of the listed menu options.");
+        }
+    }
+
+    private void showAllUpcomingBookings() {
+        if (bookingSchedule == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        view.showBookings(bookingSchedule.allUpcoming());
+    }
+
+    private void showClassroomBookings() {
+        if (bookingSchedule == null || classroomController == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        var classrooms = classroomController.listClassrooms();
+        view.showClassrooms(classrooms);
+        if (!classrooms.isEmpty()) {
+            UUID id = view.readClassroomId();
+            if (id != null) {
+                if (classrooms.stream().noneMatch(room -> room.id().equals(id))) {
+                    throw new IllegalArgumentException("Classroom not found.");
+                }
+                view.showBookings(bookingSchedule.upcomingByClassroom(id));
+            }
+        }
+    }
+
+    private void showCustomerBookings() {
+        if (bookingSchedule == null) {
+            view.showError("Choose one of the listed menu options.");
+            return;
+        }
+        var customers = customerController.findAllCustomers();
+        view.showCustomers(customers);
+        if (!customers.isEmpty()) {
+            UUID id = view.readCustomerId();
+            if (id != null) {
+                if (customers.stream().noneMatch(customer -> customer.id().equals(id))) {
+                    throw new IllegalArgumentException("Customer not found.");
+                }
+                view.showBookings(bookingSchedule.upcomingByCustomer(id));
             }
         }
     }

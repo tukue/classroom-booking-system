@@ -130,7 +130,7 @@ flowchart TD
 
 **Done when:** a valid booking is persisted and linked to its customer, booking user, and classroom; invalid requirements and conflicting bookings are rejected; comments may be omitted. This feature is implemented with transactional JDBC persistence and console/PostgreSQL integration tests.
 
-### 6. View bookings by room and customer
+### 6. View bookings by room and customer — implemented
 
 **Branch:** `feature/bookings-by-room-customer`
 
@@ -144,7 +144,7 @@ flowchart TD
 
 **Done when:** each view returns only bookings linked to the selected room or customer and displays them in time order.
 
-### 7. View all upcoming bookings
+### 7. View all upcoming bookings — implemented
 
 **Branch:** `feature/upcoming-bookings`
 

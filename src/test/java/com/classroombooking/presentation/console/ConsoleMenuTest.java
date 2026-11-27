@@ -33,6 +33,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConsoleMenuTest {
     @Test
+    void displaysEmptyAndCommentedBookingSchedules() {
+        ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+        try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
+            ConsoleView view = new ConsoleView(new ByteArrayInputStream(new byte[0]), output);
+            view.showBookings(List.of());
+            view.showBookings(List.of(new Booking(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), OffsetDateTime.parse("2026-12-01T09:00:00Z"),
+                    OffsetDateTime.parse("2026-12-01T10:00:00Z"), "Arrange projector")));
+        }
+        String display = outputBytes.toString(StandardCharsets.UTF_8);
+        assertTrue(display.contains("No upcoming bookings found."));
+        assertTrue(display.contains("Upcoming bookings (UTC)"));
+        assertTrue(display.contains("Arrange projector"));
+    }
+
+    @Test
     void registersListsAndExitsFromTheConsoleMenu() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         InMemoryCustomerRepository repository = new InMemoryCustomerRepository();
@@ -157,8 +173,9 @@ class ConsoleMenuTest {
                 equipmentRepository);
         ClassroomController classroomController = new ClassroomController(
                 new ClassroomService(classroomRepository, equipmentRepository));
-        BookingService bookingService = new BookingService(new InMemoryBookingRepository(),
-                new InMemoryBookingUserRepository(), classroomRepository, customerRepository);
+        InMemoryBookingUserRepository bookingUsers = new InMemoryBookingUserRepository();
+        BookingService bookingService = new BookingService(new InMemoryBookingRepository(bookingUsers),
+                bookingUsers, classroomRepository, customerRepository);
         BookingController bookingController = new BookingController(bookingService,
                 new RoomRequirementsFactory(equipmentRepository));
         return new ConsoleMenu(classroomController,
@@ -212,14 +229,23 @@ class ConsoleMenuTest {
 
     private static final class InMemoryBookingRepository implements BookingRepository {
         private final List<Booking> bookings = new ArrayList<>();
+        private final InMemoryBookingUserRepository bookingUsers;
+
+        private InMemoryBookingRepository(InMemoryBookingUserRepository bookingUsers) {
+            this.bookingUsers = bookingUsers;
+        }
 
         @Override
-        public Booking save(Booking booking) {
+        public Booking save(Booking booking, BookingUser bookingUser) {
             if (!findOverlapping(booking.classroomId(), booking.startsAt(), booking.endsAt()).isEmpty()) {
                 throw new IllegalArgumentException("The selected classroom is already booked for that time.");
             }
-            bookings.add(booking);
-            return booking;
+            BookingUser persistedUser = bookingUsers.findByEmail(bookingUser.email())
+                    .orElseGet(() -> bookingUsers.save(bookingUser));
+            Booking persisted = new Booking(booking.id(), booking.customerId(), persistedUser.id(),
+                    booking.classroomId(), booking.startsAt(), booking.endsAt(), booking.comments());
+            bookings.add(persisted);
+            return persisted;
         }
 
         @Override
