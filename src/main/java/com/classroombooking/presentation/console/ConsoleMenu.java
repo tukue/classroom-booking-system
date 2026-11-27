@@ -47,7 +47,7 @@ public final class ConsoleMenu {
     public void run() {
         while (true) {
             int choice = view.readMenuChoice(classroomController != null, roomSearchController != null,
-                    bookingSchedule != null, bookingController != null);
+                    bookingSchedule != null, bookingController != null && roomSearchController != null);
             try {
                 switch (choice) {
                     case 0 -> {
@@ -67,7 +67,13 @@ public final class ConsoleMenu {
                     case 8 -> showClassroomBookings();
                     case 9 -> showCustomerBookings();
                     case 10 -> showAllUpcomingBookings();
-                    case 11 -> createBooking();
+                    case 11 -> {
+                        if (bookingController == null || roomSearchController == null) {
+                            view.showError("Choose one of the listed menu options.");
+                        } else {
+                            createBooking();
+                        }
+                    }
                     default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {

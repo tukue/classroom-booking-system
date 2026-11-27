@@ -1,7 +1,7 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
-import com.classroombooking.application.booking.BookingConflictException;
+import com.classroombooking.application.booking.BookingDuplicateException;
 import com.classroombooking.application.booking.BookingService;
 import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
@@ -334,13 +334,16 @@ class DatabaseIntegrationTest {
 
                 var scheduleOnlyOutput = new ByteArrayOutputStream();
                 try (var output = new PrintStream(scheduleOnlyOutput, true, StandardCharsets.UTF_8)) {
-                    var view = new ConsoleView(new ByteArrayInputStream("10\n0\n".getBytes(StandardCharsets.UTF_8)), output);
+                    var view = new ConsoleView(
+                            new ByteArrayInputStream("11\n10\n0\n".getBytes(StandardCharsets.UTF_8)), output);
                     var customers = new CustomerController(new CustomerService(new JdbcCustomerRepository(database)));
                     var schedules = new BookingScheduleController(repository, Clock.fixed(cutoff.toInstant(), ZoneOffset.UTC));
                     new ConsoleMenu(null, customers, null, schedules, view).run();
                 }
                 String scheduleOnly = scheduleOnlyOutput.toString(StandardCharsets.UTF_8);
+                assertTrue(scheduleOnly.contains("Choose one of the listed menu options."), scheduleOnly);
                 assertTrue(scheduleOnly.contains("10. View all upcoming bookings"), scheduleOnly);
+                assertTrue(!scheduleOnly.contains("11. Create booking"), scheduleOnly);
                 assertBookingOutput(scheduleOnly, roomFirst, unrelated, past);
                 assertBookingOutput(runScheduleOption(8, room), roomFirst, roomLast, customerFirst, past, unrelated);
                 assertBookingOutput(runScheduleOption(9, customer), customerFirst, roomLast, roomFirst, past, unrelated);
@@ -490,14 +493,14 @@ class DatabaseIntegrationTest {
             BookingRequest conflictingRequest = new BookingRequest(customer.id(), "Booking Operator",
                     bookingUserEmail, room.id(), startsAt, endsAt,
                     requirementsFactory.create(20, "PROJECTOR", true), null);
-            assertThrows(BookingConflictException.class,
+            assertThrows(BookingDuplicateException.class,
                     () -> service.createBooking(conflictingRequest));
 
             BookingUser unusedBookingUser = new BookingUser(UUID.randomUUID(), "Unused Operator",
                     "unused-booking-user-" + suffix + "@example.test");
             Booking conflictingBooking = new Booking(UUID.randomUUID(), customer.id(),
                     unusedBookingUser.id(), room.id(), startsAt, endsAt, null);
-            assertThrows(BookingConflictException.class,
+            assertThrows(BookingDuplicateException.class,
                     () -> bookings.save(conflictingBooking, unusedBookingUser));
             assertTrue(bookingUsers.findByEmail(unusedBookingUser.email()).isEmpty());
 

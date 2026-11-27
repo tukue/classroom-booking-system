@@ -46,7 +46,7 @@ class BookingServiceTest {
         fixture.service.createBooking(fixture.request(
                 "09:00:00Z", "10:00:00Z", null));
 
-        assertThrows(BookingConflictException.class,
+        assertThrows(BookingDuplicateException.class,
                 () -> fixture.service.createBooking(fixture.request(
                         "09:30:00Z", "10:30:00Z", null)));
         assertThrows(IllegalArgumentException.class,
@@ -199,7 +199,7 @@ class BookingServiceTest {
         @Override
         public Booking save(Booking booking, BookingUser bookingUser) {
             if (!findOverlapping(booking.classroomId(), booking.startsAt(), booking.endsAt()).isEmpty()) {
-                throw new BookingConflictException("Room is already booked.");
+                throw new BookingDuplicateException("Room is already booked.");
             }
             BookingUser persistedUser = bookingUsers.findByEmail(bookingUser.email())
                     .orElseGet(() -> bookingUsers.save(bookingUser));

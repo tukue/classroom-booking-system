@@ -1,6 +1,6 @@
 package com.classroombooking.infrastructure.persistence;
 
-import com.classroombooking.application.booking.BookingConflictException;
+import com.classroombooking.application.booking.BookingDuplicateException;
 import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.Booking;
 import com.classroombooking.domain.model.BookingUser;
@@ -41,7 +41,7 @@ public final class JdbcBookingRepository implements BookingRepository {
             connection.setAutoCommit(false);
             try {
                 if (hasOverlap(connection, booking.classroomId(), booking.startsAt(), booking.endsAt())) {
-                    throw new BookingConflictException(
+                    throw new BookingDuplicateException(
                             "The selected classroom is already booked for that time.");
                 }
                 UUID persistedBookingUserId = findOrCreateBookingUser(connection, bookingUser);
@@ -63,7 +63,7 @@ public final class JdbcBookingRepository implements BookingRepository {
             } catch (SQLException exception) {
                 rollback(connection, exception);
                 if ("23P01".equals(exception.getSQLState())) {
-                    throw new BookingConflictException(
+                    throw new BookingDuplicateException(
                             "The selected classroom is already booked for that time.", exception);
                 }
                 LOGGER.log(Level.WARNING, "Could not save classroom booking.", exception);

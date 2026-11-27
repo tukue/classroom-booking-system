@@ -39,7 +39,7 @@ public final class BookingService {
             throw new IllegalArgumentException("The selected classroom does not meet the requirements.");
         }
         if (!bookingRepository.findOverlapping(classroom.id(), request.startsAt(), request.endsAt()).isEmpty()) {
-            throw new BookingConflictException("The selected classroom is already booked for that time.");
+            throw new BookingDuplicateException("The selected classroom is already booked for that time.");
         }
 
         BookingUser bookingUser = bookingUserRepository.findByEmail(request.bookingUserEmail())
