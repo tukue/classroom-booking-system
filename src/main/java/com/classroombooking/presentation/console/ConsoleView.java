@@ -10,12 +10,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.Objects;
 import java.util.Scanner;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
-/** Handles console prompts and output without applying customer or persistence rules. */
+/** Handles console prompts and output without applying domain or persistence rules. */
 public final class ConsoleView {
     private final Scanner scanner;
     private final PrintStream output;
@@ -26,19 +26,14 @@ public final class ConsoleView {
     }
 
     public int readMenuChoice() {
-        return readMenuChoice(false);
-    }
-
-    public int readMenuChoice(boolean classroomsEnabled) {
         output.println("\nClassroom Booking System");
         output.println("1. Register customer");
         output.println("2. List customers");
-        if (classroomsEnabled) {
-            output.println("3. List classrooms");
-            output.println("4. Create classroom");
-            output.println("5. Update classroom");
-            output.println("6. Delete classroom");
-        }
+        output.println("3. List classrooms");
+        output.println("4. Create classroom");
+        output.println("5. Update classroom");
+        output.println("6. Delete classroom");
+        output.println("7. Search available classrooms");
         output.println("0. Exit");
         return readInteger("Choose an option: ");
     }
@@ -49,6 +44,18 @@ public final class ConsoleView {
         return readInteger("Customer type: ");
     }
 
+    public int readInteger(String prompt) {
+        String value = readText(prompt);
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.strip());
+        } catch (NumberFormatException exception) {
+            return -1;
+        }
+    }
+
     public String readText(String prompt) {
         output.print(prompt);
         output.flush();
@@ -56,39 +63,50 @@ public final class ConsoleView {
     }
 
     UUID readClassroomId() {
-        String id = readText("Classroom ID: ");
-        if (id == null) {
+        String value = readText("Classroom ID: ");
+        if (value == null) {
             return null;
         }
         try {
-            return UUID.fromString(id.strip());
+            return UUID.fromString(value.strip());
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Enter a valid classroom ID.", exception);
         }
     }
 
-    ClassroomDetails readClassroomDetails(List<Equipment> catalog) {
+    ClassroomDetails readClassroomDetails(List<Equipment> equipmentCatalog) {
         String name = readText("Classroom name: ");
         String capacity = readText("Seating capacity: ");
         String equipment = readText("Equipment (comma-separated, blank for none). Available: "
-                + equipmentNames(catalog) + ". Enter equipment: ");
+                + equipmentNames(equipmentCatalog) + ". Enter equipment: ");
         String accessibility = readText("Accessible? (yes/no): ");
         if (name == null || capacity == null || equipment == null || accessibility == null) {
             return null;
         }
-        int seats;
+        int seatingCapacity;
         try {
-            seats = Integer.parseInt(capacity.strip());
+            seatingCapacity = Integer.parseInt(capacity.strip());
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Seating capacity must be a whole number.", exception);
         }
-        List<String> selected = equipment.isBlank() ? List.of() : List.of(equipment.split(",", -1));
-        boolean accessible = switch (accessibility.strip().toLowerCase(Locale.ROOT)) {
+        List<String> selectedEquipment = equipment.isBlank()
+                ? List.of() : List.of(equipment.split(",", -1));
+        return new ClassroomDetails(name, seatingCapacity, selectedEquipment, parseYesNo(accessibility));
+    }
+
+    boolean readYesNo(String prompt) {
+        return parseYesNo(readText(prompt));
+    }
+
+    private boolean parseYesNo(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Enter yes or no for accessibility.");
+        }
+        return switch (value.strip().toLowerCase(Locale.ROOT)) {
             case "yes", "y" -> true;
             case "no", "n" -> false;
             default -> throw new IllegalArgumentException("Enter yes or no for accessibility.");
         };
-        return new ClassroomDetails(name, seats, selected, accessible);
     }
 
     void showClassrooms(List<Classroom> classrooms) {
@@ -103,14 +121,6 @@ public final class ConsoleView {
         }
     }
 
-    private String equipmentNames(Collection<Equipment> equipment) {
-        return equipment.isEmpty() ? "none" : equipment.stream()
-                .map(Equipment::name).sorted().collect(Collectors.joining(", "));
-    }
-
-    record ClassroomDetails(String name, int capacity, List<String> equipment, boolean accessible) {
-    }
-
     public void showCustomers(List<Customer> customers) {
         if (customers.isEmpty()) {
             output.println("No customers registered.");
@@ -118,6 +128,21 @@ public final class ConsoleView {
         }
         customers.forEach(customer -> output.printf("%s | %s | %s%n",
                 customer.id(), customer.name(), customer.email()));
+    }
+
+    void showEquipmentOptions(List<Equipment> equipment) {
+        output.println("Available equipment: " + equipmentNames(equipment));
+    }
+
+    void showAvailableClassrooms(List<Classroom> classrooms) {
+        if (classrooms.isEmpty()) {
+            output.println("No available classrooms match those requirements.");
+            return;
+        }
+        classrooms.forEach(classroom -> output.printf(
+                "%s | %s | capacity: %d | accessible: %s | equipment: %s%n",
+                classroom.id(), classroom.name(), classroom.seatingCapacity(),
+                classroom.accessible() ? "yes" : "no", equipmentNames(classroom.equipment())));
     }
 
     public void showMessage(String message) {
@@ -128,15 +153,11 @@ public final class ConsoleView {
         output.println("Error: " + message);
     }
 
-    private int readInteger(String prompt) {
-        String value = readText(prompt);
-        if (value == null) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(value.strip());
-        } catch (NumberFormatException exception) {
-            return -1;
-        }
+    private String equipmentNames(Collection<Equipment> equipment) {
+        return equipment.isEmpty() ? "none" : equipment.stream().map(Equipment::name)
+                .sorted().collect(Collectors.joining(", "));
+    }
+
+    record ClassroomDetails(String name, int capacity, List<String> equipment, boolean accessible) {
     }
 }

@@ -1,31 +1,30 @@
 package com.classroombooking.presentation.console;
 
-import com.classroombooking.domain.model.Customer;
 import com.classroombooking.application.persistence.PersistenceException;
+import com.classroombooking.domain.model.Classroom;
+import com.classroombooking.domain.model.Customer;
 
 import java.util.Objects;
 import java.util.UUID;
 
-/** Runs the customer and classroom console actions. */
+/** Runs the customer, classroom, and room-search console actions. */
 public final class ConsoleMenu {
-    private final CustomerController customerController;
     private final ClassroomController classroomController;
+    private final CustomerController customerController;
+    private final RoomSearchController roomSearchController;
     private final ConsoleView view;
 
-    public ConsoleMenu(CustomerController customerController, ConsoleView view) {
-        this(null, customerController, view);
-    }
-
     public ConsoleMenu(ClassroomController classroomController, CustomerController customerController,
-                       ConsoleView view) {
-        this.classroomController = classroomController;
+                       RoomSearchController roomSearchController, ConsoleView view) {
+        this.classroomController = Objects.requireNonNull(classroomController);
         this.customerController = Objects.requireNonNull(customerController);
+        this.roomSearchController = Objects.requireNonNull(roomSearchController);
         this.view = Objects.requireNonNull(view);
     }
 
     public void run() {
         while (true) {
-            int choice = view.readMenuChoice(classroomController != null);
+            int choice = view.readMenuChoice();
             try {
                 switch (choice) {
                     case 0 -> {
@@ -34,53 +33,16 @@ public final class ConsoleMenu {
                     }
                     case 1 -> registerCustomer();
                     case 2 -> view.showCustomers(customerController.findAllCustomers());
-                    default -> {
-                        if (classroomController == null) {
-                            view.showError("Choose one of the listed menu options.");
-                        } else {
-                            manageClassrooms(choice);
-                        }
-                    }
+                    case 3 -> view.showClassrooms(classroomController.listClassrooms());
+                    case 4 -> saveClassroom(null);
+                    case 5 -> updateClassroom();
+                    case 6 -> deleteClassroom();
+                    case 7 -> searchAvailableClassrooms();
+                    default -> view.showError("Choose one of the listed menu options.");
                 }
             } catch (IllegalArgumentException | PersistenceException exception) {
                 view.showError(exception.getMessage());
             }
-        }
-    }
-
-    private void manageClassrooms(int choice) {
-        switch (choice) {
-            case 3 -> view.showClassrooms(classroomController.listClassrooms());
-            case 4 -> saveClassroom(null);
-            case 5 -> {
-                UUID id = view.readClassroomId();
-                if (id != null) {
-                    saveClassroom(id);
-                }
-            }
-            case 6 -> {
-                UUID id = view.readClassroomId();
-                if (id != null) {
-                    classroomController.delete(id);
-                    view.showMessage("Classroom deleted.");
-                }
-            }
-            default -> view.showError("Choose one of the listed menu options.");
-        }
-    }
-
-    private void saveClassroom(UUID id) {
-        var details = view.readClassroomDetails(classroomController.listEquipment());
-        if (details == null) {
-            return;
-        }
-        if (id == null) {
-            var created = classroomController.create(
-                    details.name(), details.capacity(), details.equipment(), details.accessible());
-            view.showMessage("Created classroom " + created.name() + " (" + created.id() + ").");
-        } else {
-            classroomController.update(id, details.name(), details.capacity(), details.equipment(), details.accessible());
-            view.showMessage("Classroom updated.");
         }
     }
 
@@ -104,4 +66,54 @@ public final class ConsoleMenu {
                 : customerController.registerIndividual(name, email);
         view.showMessage("Registered customer " + customer.name() + ".");
     }
+
+    private void saveClassroom(UUID id) {
+        ConsoleView.ClassroomDetails details = view.readClassroomDetails(
+                classroomController.listEquipment());
+        if (details == null) {
+            return;
+        }
+        if (id == null) {
+            Classroom created = classroomController.create(details.name(), details.capacity(),
+                    details.equipment(), details.accessible());
+            view.showMessage("Created classroom " + created.name() + " (" + created.id() + ").");
+        } else {
+            classroomController.update(id, details.name(), details.capacity(),
+                    details.equipment(), details.accessible());
+            view.showMessage("Classroom updated.");
+        }
+    }
+
+    private void updateClassroom() {
+        UUID classroomId = view.readClassroomId();
+        if (classroomId != null) {
+            saveClassroom(classroomId);
+        }
+    }
+
+    private void deleteClassroom() {
+        UUID classroomId = view.readClassroomId();
+        if (classroomId != null) {
+            classroomController.delete(classroomId);
+            view.showMessage("Classroom deleted.");
+        }
+    }
+
+    private void searchAvailableClassrooms() {
+        String startsAt = view.readText("Start time (ISO-8601 with offset): ");
+        String endsAt = view.readText("End time (ISO-8601 with offset): ");
+        if (startsAt == null || endsAt == null) {
+            return;
+        }
+        int capacity = view.readInteger("Required capacity: ");
+        view.showEquipmentOptions(roomSearchController.findAllEquipment());
+        String requiredEquipment = view.readText("Required equipment (comma-separated, optional): ");
+        if (requiredEquipment == null) {
+            return;
+        }
+        boolean accessibilityRequired = view.readYesNo("Accessibility required? (yes/no): ");
+        view.showAvailableClassrooms(roomSearchController.findAvailableRooms(
+                startsAt, endsAt, capacity, requiredEquipment, accessibilityRequired));
+    }
+
 }

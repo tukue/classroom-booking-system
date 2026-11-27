@@ -1,15 +1,22 @@
 package com.classroombooking.infrastructure.database;
 
 import com.classroombooking.Main;
+import com.classroombooking.application.classroom.ClassroomService;
 import com.classroombooking.application.customer.CustomerService;
+import com.classroombooking.application.roomsearch.RoomSearchService;
 import com.classroombooking.application.persistence.PersistenceException;
 import com.classroombooking.domain.model.CompanyCustomer;
 import com.classroombooking.domain.model.Customer;
 import com.classroombooking.domain.model.IndividualCustomer;
 import com.classroombooking.domain.repository.CustomerRepository;
 import com.classroombooking.infrastructure.persistence.JdbcCustomerRepository;
+import com.classroombooking.infrastructure.persistence.JdbcBookingAvailabilityRepository;
+import com.classroombooking.infrastructure.persistence.JdbcClassroomRepository;
+import com.classroombooking.infrastructure.persistence.JdbcEquipmentRepository;
 import com.classroombooking.presentation.console.ConsoleMenu;
+import com.classroombooking.presentation.console.ClassroomController;
 import com.classroombooking.presentation.console.CustomerController;
+import com.classroombooking.presentation.console.RoomSearchController;
 import com.classroombooking.presentation.console.ConsoleView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -89,14 +96,14 @@ class DatabaseIntegrationTest {
                 insertBookingUser(connection, bookingUserId);
                 UUID classroomId = findFirstClassroomId(connection);
                 insertBooking(connection, firstBookingId, customerId, bookingUserId, classroomId,
-                        OffsetDateTime.parse("2030-06-01T09:00:00Z"),
-                        OffsetDateTime.parse("2030-06-01T10:00:00Z"));
+                        OffsetDateTime.parse("2026-12-01T09:00:00Z"),
+                        OffsetDateTime.parse("2026-12-01T10:00:00Z"));
 
                 SQLException conflict = assertThrows(SQLException.class,
                         () -> insertBooking(connection, secondBookingId, customerId, bookingUserId,
                                 classroomId,
-                                OffsetDateTime.parse("2030-06-01T09:30:00Z"),
-                                OffsetDateTime.parse("2030-06-01T10:30:00Z")));
+                                OffsetDateTime.parse("2026-12-01T09:30:00Z"),
+                                OffsetDateTime.parse("2026-12-01T10:30:00Z")));
                 assertEquals("23P01", conflict.getSQLState());
             } finally {
                 connection.rollback();
@@ -204,6 +211,11 @@ class DatabaseIntegrationTest {
 
         CustomerRepository repository = new JdbcCustomerRepository(databaseManager);
         CustomerController controller = new CustomerController(new CustomerService(repository));
+        RoomSearchService roomSearchService = new RoomSearchService(
+                new JdbcClassroomRepository(databaseManager),
+                new JdbcBookingAvailabilityRepository(databaseManager));
+        RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
+                new JdbcEquipmentRepository(databaseManager));
         String suffix = UUID.randomUUID().toString();
         String companyEmail = "console-company-" + suffix + "@example.test";
         String individualEmail = "console-individual-" + suffix + "@example.test";
@@ -213,7 +225,8 @@ class DatabaseIntegrationTest {
         try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
             ConsoleView view = new ConsoleView(
                     new ByteArrayInputStream(menuInput.getBytes(StandardCharsets.UTF_8)), output);
-            new ConsoleMenu(controller, view).run();
+            new ConsoleMenu(createClassroomController(databaseManager), controller,
+                    roomSearchController, view).run();
         }
 
         try {
@@ -233,6 +246,60 @@ class DatabaseIntegrationTest {
                     .filter(customer -> customer.email().equals(companyEmail)
                             || customer.email().equals(individualEmail))
                     .forEach(customer -> repository.deleteById(customer.id()));
+        }
+    }
+
+    @Test
+    void consoleRoomSearchFiltersByRoomRequirementsAndOverlappingBookings() throws Exception {
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        new DatabaseInitializer(databaseManager).initialize();
+
+        UUID customerId = UUID.randomUUID();
+        UUID bookingUserId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        try {
+            try (Connection connection = databaseManager.openConnection()) {
+                insertCustomer(connection, customerId);
+                insertBookingUser(connection, bookingUserId);
+                UUID classroomId = findClassroomId(connection, "Training Room 05");
+                insertBooking(connection, bookingId, customerId, bookingUserId, classroomId,
+                        OffsetDateTime.parse("2026-12-02T09:00:00Z"),
+                        OffsetDateTime.parse("2026-12-02T10:00:00Z"));
+            }
+
+            RoomSearchService roomSearchService = new RoomSearchService(
+                    new JdbcClassroomRepository(databaseManager),
+                    new JdbcBookingAvailabilityRepository(databaseManager));
+            RoomSearchController roomSearchController = new RoomSearchController(roomSearchService,
+                    new JdbcEquipmentRepository(databaseManager));
+            CustomerController customerController = new CustomerController(
+                    new CustomerService(new JdbcCustomerRepository(databaseManager)));
+            String input = "7\n2026-12-02T09:30:00Z\n2026-12-02T10:30:00Z\n"
+                    + "20\nPROJECTOR\ny\n0\n";
+            ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+            try (PrintStream output = new PrintStream(outputBytes, true, StandardCharsets.UTF_8)) {
+                ConsoleView view = new ConsoleView(
+                        new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)), output);
+                new ConsoleMenu(createClassroomController(databaseManager), customerController,
+                        roomSearchController, view).run();
+            }
+
+            String result = outputBytes.toString(StandardCharsets.UTF_8);
+            assertTrue(result.contains("Training Room 07"));
+            assertTrue(!result.contains("Training Room 05"));
+        } finally {
+            deleteBookingFixtures(databaseManager, bookingId, bookingUserId, customerId);
+        }
+    }
+
+    @Test
+    void classroomLookupHelperReportsMissingSeededRoomClearly() throws Exception {
+        new DatabaseInitializer(DatabaseManager.getInstance()).initialize();
+
+        try (Connection connection = DatabaseManager.getInstance().openConnection()) {
+            IllegalStateException exception = assertThrows(IllegalStateException.class,
+                    () -> findClassroomId(connection, "Missing Training Room"));
+            assertEquals("Classroom not found in seed data: Missing Training Room", exception.getMessage());
         }
     }
 
@@ -275,6 +342,25 @@ class DatabaseIntegrationTest {
         }
     }
 
+    private ClassroomController createClassroomController(DatabaseManager databaseManager) {
+        return new ClassroomController(new ClassroomService(
+                new JdbcClassroomRepository(databaseManager),
+                new JdbcEquipmentRepository(databaseManager)));
+    }
+
+    private UUID findClassroomId(Connection connection, String classroomName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT classroom_id FROM classrooms WHERE name = ?")) {
+            statement.setString(1, classroomName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new IllegalStateException("Classroom not found in seed data: " + classroomName);
+                }
+                return resultSet.getObject(1, UUID.class);
+            }
+        }
+    }
+
     private void insertBooking(Connection connection, UUID bookingId, UUID customerId,
                                UUID bookingUserId, UUID classroomId, OffsetDateTime startsAt,
                                OffsetDateTime endsAt) throws SQLException {
@@ -288,6 +374,27 @@ class DatabaseIntegrationTest {
             statement.setObject(5, startsAt);
             statement.setObject(6, endsAt);
             statement.executeUpdate();
+        }
+    }
+
+    private void deleteBookingFixtures(DatabaseManager databaseManager, UUID bookingId,
+                                       UUID bookingUserId, UUID customerId) throws SQLException {
+        try (Connection connection = databaseManager.openConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM bookings WHERE booking_id = ?")) {
+                statement.setObject(1, bookingId);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM booking_users WHERE booking_user_id = ?")) {
+                statement.setObject(1, bookingUserId);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM customers WHERE customer_id = ?")) {
+                statement.setObject(1, customerId);
+                statement.executeUpdate();
+            }
         }
     }
 }

@@ -32,6 +32,6 @@ class BookingTest {
     }
 
     private OffsetDateTime time(String time) {
-        return OffsetDateTime.parse("2030-06-01T" + time);
+        return OffsetDateTime.parse("2026-12-01T" + time);
     }
 }
